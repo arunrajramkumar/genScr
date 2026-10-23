@@ -10,10 +10,13 @@ name: Seed hosted database
 # Setup: Repo → Settings → Secrets and variables → Actions → New repository secret
 #          RENDER_DATABASE_URL = Render "External Database URL"
 # Run:   Actions → Seed hosted database → Run workflow (type REPLACE to confirm)
+#   or:  git tag seed-$(date +%Y%m%d-%H%M) && git push origin --tags   (uses the defaults below)
 #
 # Takes ~40 min for prices since 2021, plus ~2 h for Nifty 500 fundamentals.
 
 on:
+  push:
+    tags: ["seed-*"] # pushing a seed-* tag is the confirmation; inputs fall back to defaults
   workflow_dispatch:
     inputs:
       since:
@@ -52,11 +55,12 @@ jobs:
           --health-cmd "pg_isready -U genscr" --health-interval 5s --health-timeout 5s --health-retries 20
     env:
       DATABASE_URL: postgresql://genscr:genscr@localhost:5432/genscr
-      SINCE: ${{ inputs.since }}
+      SINCE: ${{ inputs.since || '2021-01-01' }}
+      FUNDAMENTALS: ${{ inputs.fundamentals || 'nifty500' }}
     steps:
       - name: Check inputs and secret
         env:
-          CONFIRM: ${{ inputs.confirm }}
+          CONFIRM: ${{ github.event_name == 'push' && 'REPLACE' || inputs.confirm }}
           DB_URL: ${{ secrets.RENDER_DATABASE_URL }}
         run: |
           [ "$CONFIRM" = "REPLACE" ] || { echo "::error::Type REPLACE in the 'confirm' input to run this workflow."; exit 1; }
@@ -94,15 +98,15 @@ jobs:
         working-directory: backend
         run: python -u -m app.ingest.equity_list
 
-      - name: Daily prices since ${{ inputs.since }}
+      - name: Daily prices
         working-directory: backend
         run: python -u -m app.ingest.bhavcopy --from "$SINCE"
 
       - name: Fundamentals from results filings
-        if: inputs.fundamentals != 'none'
+        if: env.FUNDAMENTALS != 'none'
         continue-on-error: true # NSE may refuse cloud IPs; prices are still loaded
         working-directory: backend
-        run: python -u -m app.ingest.results --universe ${{ inputs.fundamentals }}
+        run: python -u -m app.ingest.results --universe "$FUNDAMENTALS"
 
       - name: Compute metrics
         working-directory: backend
