@@ -8,6 +8,7 @@ from datetime import date
 from decimal import Decimal
 
 from app.services.adjust import adjust, split_factors
+from app.services.compliance import filter_compliant
 
 MAX_DAILY_MOVE = 0.6  # ignore >60% one-day moves (relistings / data errors)
 
@@ -160,4 +161,5 @@ def build_facts(stock: dict, prices: list[dict], fy: list[dict], rank: dict | No
 
     priority = ["profit_per_day", "loss_per_day", "best_day", "mcap_rank", "sector_leader", "revenue_multiple", "debt_free",
                 "cash_pile", "win_streak", "up_years", "peak", "worst_day", "sector_top3", "revenue_shrink", "listed_since"]
+    facts = filter_compliant(facts)  # defence in depth: never show advice-like wording
     return sorted(facts, key=lambda f: priority.index(f["id"]) if f["id"] in priority else 99)

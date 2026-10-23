@@ -6,6 +6,7 @@ import clsx from "clsx";
 import { ArrowDownRight, ArrowUpRight, Flame, SlidersHorizontal } from "lucide-react";
 import SearchBox from "@/components/SearchBox";
 import TickerTape from "@/components/TickerTape";
+import { StaleDataBanner } from "@/components/Legal";
 import { ErrorNote, Loading, heatClass } from "@/components/ui";
 import { api } from "@/lib/api";
 import { changeClass, fmtCr, fmtPct, fmtPrice } from "@/lib/format";
@@ -92,6 +93,7 @@ export default function Home() {
 
       {data?.as_of && b && (
         <>
+          <StaleDataBanner asOf={data.as_of} />
           <section className="panel p-5">
             <div className="flex flex-wrap items-end justify-between gap-4">
               <div>

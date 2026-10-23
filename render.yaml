@@ -45,6 +45,10 @@ services:
     envVars:
       - key: NEXT_PUBLIC_API_URL # e.g. https://genscr-api.onrender.com (baked in at build time; redeploy after changing)
         sync: false
+      - key: NEXT_PUBLIC_SITE_NAME
+        value: genScr
+      - key: NEXT_PUBLIC_CONTACT_EMAIL # shown on Privacy/Terms as the grievance contact
+        sync: false
 
   # --- Paid plans only: uncomment when upgrading -------------------------------
   # # 14:00 UTC = 19:30 IST, Mon-Fri: load the day's bhavcopy and rebuild metrics.

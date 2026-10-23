@@ -81,6 +81,7 @@ export default function DidYouKnow({ symbol }: { symbol: string }) {
           <button onClick={() => go(1)} className="rounded-md border border-line p-1 text-muted hover:text-white" aria-label="Next fact"><ChevronRight className="h-4 w-4" /></button>
         </div>
       </div>
+      <p className="relative mt-3 text-[10px] text-muted">Facts are computed from public data and are not investment advice.</p>
       {!paused && facts.length > 1 && (
         <div className="absolute bottom-0 left-0 h-0.5 bg-gold/50" style={{ animation: `grow ${ROTATE_MS}ms linear` }} key={`bar-${i}`} />
       )}

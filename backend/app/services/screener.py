@@ -40,19 +40,20 @@ ALIASES = {
 OPS = {">", ">=", "<", "<=", "=", "!="}
 
 PRESETS = [
-    {"id": "quality", "name": "Quality Compounders", "description": "High returns on capital, low debt",
+    {"id": "quality", "name": "High ROE & ROCE, low debt", "description": "ROE and ROCE above 18%, debt/equity below 0.5",
      "query": "roe > 18 and roce > 18 and debt_to_equity < 0.5 and market_cap > 1000"},
-    {"id": "value", "name": "Value with Strength", "description": "Cheap on earnings and book, financially improving",
+    {"id": "value", "name": "Low P/E & P/B, F-score 6+", "description": "P/E below 15, P/B below 2, ROE above 12%, Piotroski 6+",
      "query": "pe < 15 and pb < 2 and roe > 12 and piotroski_f >= 6"},
-    {"id": "growth", "name": "Fast Growers", "description": "20%+ revenue and profit growth",
+    {"id": "growth", "name": "20%+ revenue & profit growth", "description": "Revenue and profit up more than 20% year on year",
      "query": "revenue_growth_yoy > 20 and profit_growth_yoy > 20 and roe > 15"},
-    {"id": "momentum", "name": "Momentum Leaders", "description": "Near 52-week highs, not overbought",
+    {"id": "momentum", "name": "Near 52W high, 1Y return 30%+", "description": "Within 5% of 52-week high, RSI below 75",
      "query": "pct_from_52w_high > -5 and return_1y > 30 and rsi_14 < 75"},
-    {"id": "safe", "name": "Fortress Balance Sheets", "description": "Low bankruptcy risk, strong F-score",
+    {"id": "safe", "name": "Low leverage, Altman Z'' 2.6+",
+     "description": "Altman Z'' above 2.6, debt/equity below 0.3, Piotroski 7+",
      "query": "altman_z > 2.6 and debt_to_equity < 0.3 and piotroski_f >= 7"},
-    {"id": "dividend", "name": "Dividend Payers", "description": "3%+ yield with a healthy balance sheet",
+    {"id": "dividend", "name": "Dividend yield 3%+", "description": "Trailing yield above 3%, debt/equity below 1",
      "query": "dividend_yield > 3 and debt_to_equity < 1 and market_cap > 1000"},
-    {"id": "oversold", "name": "Oversold Large Caps", "description": "RSI below 30, market cap above ₹5,000 Cr",
+    {"id": "oversold", "name": "RSI below 30, large caps", "description": "RSI(14) below 30, market cap above ₹5,000 Cr",
      "query": "rsi_14 < 30 and market_cap > 5000"},
 ]
 

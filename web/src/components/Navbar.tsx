@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { BarChart3 } from "lucide-react";
 import clsx from "clsx";
 import SearchBox from "./SearchBox";
+import { SITE_NAME } from "@/lib/site";
 
 const LINKS = [
   { href: "/", label: "Markets" },
@@ -21,7 +22,7 @@ export default function Navbar() {
           <span className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-accent to-emerald-400 text-bg">
             <BarChart3 className="h-4 w-4" />
           </span>
-          <span className="hidden sm:inline">genScr</span>
+          <span className="hidden sm:inline">{SITE_NAME}</span>
         </Link>
         <nav className="flex items-center gap-1">
           {LINKS.map((l) => (

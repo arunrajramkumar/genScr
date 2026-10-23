@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import clsx from "clsx";
-import { Trophy } from "lucide-react";
 import { CompareChart, LINE_COLORS } from "@/components/PriceChart";
+import { SectionNote } from "@/components/Legal";
 import { ErrorNote, Loading } from "@/components/ui";
 import { api } from "@/lib/api";
 import { fmtField, toNum } from "@/lib/format";
@@ -57,7 +57,7 @@ function Compare() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Compare stocks</h1>
-        <p className="mt-1 text-sm text-muted">Enter 2 to 5 NSE symbols. The best value in each row is highlighted.</p>
+        <p className="mt-1 text-sm text-muted">Enter 2 to 5 NSE symbols. The highest or lowest value of each metric is highlighted for reference.</p>
       </div>
       <form onSubmit={submit} className="flex gap-2">
         <input value={input} onChange={(e) => setInput(e.target.value)} placeholder="TCS, INFY, HCLTECH" className="panel num w-full max-w-lg px-4 py-2 text-sm outline-none focus:border-accent/70" />
@@ -81,6 +81,7 @@ function Compare() {
             <CompareChart series={data.performance} />
           </div>
 
+          <SectionNote>Highlights mark the numerically higher/lower value only. They are not a ranking or a recommendation.</SectionNote>
           <div className="panel overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -104,7 +105,7 @@ function Compare() {
                       {data.stocks.map((s, i) => (
                         <td key={s.symbol} className={clsx("num px-4 py-2 text-right", i === winner && "font-semibold text-up")}>
                           <span className="inline-flex items-center gap-1">
-                            {i === winner && <Trophy className="h-3 w-3" />}
+                            {i === winner && <span className="h-1.5 w-1.5 rounded-full bg-up" aria-hidden />}
                             {fmtField(s[field as keyof typeof s] as string | number | null, meta?.unit ?? "")}
                           </span>
                         </td>

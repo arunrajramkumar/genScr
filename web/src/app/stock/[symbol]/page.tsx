@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { ArrowDownRight, ArrowUpRight, GitCompare } from "lucide-react";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import DidYouKnow from "@/components/DidYouKnow";
+import { SectionNote, StaleDataBanner } from "@/components/Legal";
 import Outlook from "@/components/Outlook";
 import PriceCagr from "@/components/PriceCagr";
 import { StockChart } from "@/components/PriceChart";
@@ -15,6 +16,7 @@ import Signals from "@/components/Signals";
 import { ErrorNote, Loading, RangeBar, ScoreBadge, Stat } from "@/components/ui";
 import { api } from "@/lib/api";
 import { changeClass, fmtCr, fmtNum, fmtPct, fmtPrice, fmtVolume, toNum } from "@/lib/format";
+import { ENABLE_PROJECTIONS } from "@/lib/site";
 import type { Candle, Fundamental, Stock } from "@/lib/types";
 
 const FIN_ROWS = [
@@ -56,6 +58,7 @@ export default function StockPage() {
 
   return (
     <div className="space-y-6">
+      <StaleDataBanner asOf={stock.as_of} />
       {/* Hero */}
       <section className="relative animate-fade-up overflow-hidden rounded-3xl border border-white/[0.06] p-6">
         <div className="grid-bg pointer-events-none absolute inset-0" />
@@ -131,7 +134,7 @@ export default function StockPage() {
       {prices && prices.length > 0 && (
         <>
           <ReturnsCalculator symbol={stock.symbol} prices={prices} />
-          <Outlook prices={prices} funds={funds} />
+          {ENABLE_PROJECTIONS && <Outlook prices={prices} funds={funds} />}
         </>
       )}
 
@@ -154,12 +157,12 @@ export default function StockPage() {
           <div className="label mb-4">Technicals</div>
           <div className="space-y-2.5 text-sm">
             <Row label="RSI (14)">
-              <span className={clsx("num", rsi !== null && (rsi > 70 ? "text-down" : rsi < 30 ? "text-up" : "text-white"))}>
-                {fmtNum(stock.rsi_14)}{rsi !== null && (rsi > 70 ? " · overbought" : rsi < 30 ? " · oversold" : "")}
+              <span className={clsx("num", rsi !== null && (rsi > 70 || rsi < 30) ? "text-gold" : "text-white")}>
+                {fmtNum(stock.rsi_14)}{rsi !== null && (rsi > 70 ? " · above 70" : rsi < 30 ? " · below 30" : "")}
               </span>
             </Row>
             {rsi !== null && (
-              <div className="relative h-1.5 rounded-full bg-gradient-to-r from-up/50 via-slate-600 to-down/50">
+              <div className="relative h-1.5 rounded-full bg-gradient-to-r from-slate-500/60 via-slate-700 to-slate-500/60">
                 <div className="absolute top-1/2 h-3 w-1 -translate-y-1/2 rounded bg-white" style={{ left: `${rsi}%` }} />
               </div>
             )}
@@ -183,6 +186,11 @@ export default function StockPage() {
           </ul>
         </div>
       </section>
+
+      <SectionNote>
+        Figures and scores are computed mechanically from exchange data and company filings for education only. They are not
+        a rating, research report or recommendation to buy, sell or hold {stock.symbol}.
+      </SectionNote>
 
       {/* Financials */}
       <section className="panel overflow-x-auto p-5">

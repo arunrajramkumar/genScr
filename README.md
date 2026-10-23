@@ -76,6 +76,19 @@ python -m app.ingest.compute_metrics
 
 Or load your own CSV in the `data/fundamentals_template.csv` format: `make fundamentals FILE=data/my.csv`.
 
+## Compliance guardrails
+
+genScr is built to stay an **information tool**, not an adviser (SEBI Research Analyst / Investment Adviser rules, DPDP Act, IT Act, NSE data terms):
+
+- **No advice language:** `app/services/compliance.py` flags recommendation, price-target, tip and assured-return wording (pattern list in that file). Generated facts are filtered through it at runtime, and `tests/test_compliance_repo.py` scans every user-facing file so CI fails on violations.
+- **Disclaimers:** one shared text (`web/src/lib/site.ts`) in the footer of every page, a first-visit notice, and Disclaimer / Terms / Privacy pages. Inline notes on the screener, compare, calculator and facts.
+- **No return projections by default:** the 5-year outlook renders only with `NEXT_PUBLIC_ENABLE_PROJECTIONS=true`. Get legal advice before enabling it.
+- **Neutral presentation:** factual preset names, RSI shown without buy/sell colours, compare highlights aren't a "winner".
+- **Data terms:** end-of-day only, source attribution, stale-data banner, per-IP API rate limit (bulk redistribution), `noindex` API, minimum 1 s between NSE requests.
+- **Security headers** on web and API.
+
+**Before public launch:** set `NEXT_PUBLIC_CONTACT_EMAIL`, have a lawyer review the legal pages, and check your employer's side-project policy.
+
 ## Roadmap
 
 1. TTM (trailing-twelve-month) ratios from quarterly results; dividends in total-return calculations

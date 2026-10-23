@@ -16,8 +16,9 @@ export function signalsFor(s: Stock): { text: string; tone: Tone }[] {
   if (fromHigh !== null && fromHigh < -40) out.push({ text: `${Math.abs(fromHigh).toFixed(0)}% below 52W high`, tone: "down" });
   if (close !== null && sma200 !== null) out.push(close > sma200 ? { text: "Above 200 DMA", tone: "up" } : { text: "Below 200 DMA", tone: "down" });
   if (sma50 !== null && sma200 !== null && close !== null && close > sma50 && sma50 > sma200) out.push({ text: "Strong uptrend", tone: "up" });
-  if (rsi !== null && rsi > 70) out.push({ text: "RSI overbought", tone: "down" });
-  if (rsi !== null && rsi < 30) out.push({ text: "RSI oversold", tone: "up" });
+  // RSI states are descriptive technical readings, shown in a neutral tone (not a buy/sell cue).
+  if (rsi !== null && rsi > 70) out.push({ text: "RSI above 70", tone: "neutral" });
+  if (rsi !== null && rsi < 30) out.push({ text: "RSI below 30", tone: "neutral" });
   if (de !== null && de < 0.05) out.push({ text: "Debt-free", tone: "up" });
   if (de !== null && de > 2) out.push({ text: "High leverage", tone: "down" });
   if (roe !== null && roe > 20) out.push({ text: `High ROE ${roe.toFixed(0)}%`, tone: "up" });

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useState } from "react";
 import clsx from "clsx";
 import { ArrowDown, ArrowUp, Play } from "lucide-react";
+import { SectionNote } from "@/components/Legal";
 import { ErrorNote, Loading } from "@/components/ui";
 import { api } from "@/lib/api";
 import { changeClass, fmtField } from "@/lib/format";
@@ -67,6 +68,8 @@ function Screener() {
           </button>
         ))}
       </div>
+
+      <SectionNote>Presets are example filters on public data, not stock picks or recommendations. Results change daily.</SectionNote>
 
       <div className="panel p-4">
         <textarea
