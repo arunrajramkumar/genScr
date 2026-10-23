@@ -38,6 +38,12 @@ def test_fundamental_ratios():
     assert r["debt_to_equity"] == pytest.approx(250 / 700)
 
 
+def test_dividend_yield():
+    r = fundamental_ratios({**CUR, "dividends_paid": 48.0}, PREV, close=240.0)
+    assert r["dividend_yield"] == pytest.approx(2.0)  # ₹48 Cr / ₹2,400 Cr
+    assert fundamental_ratios(CUR, PREV, close=240.0)["dividend_yield"] is None
+
+
 def test_negative_earnings_have_no_pe():
     r = fundamental_ratios({**CUR, "net_profit": -5}, PREV, close=240.0)
     assert r["pe"] is None

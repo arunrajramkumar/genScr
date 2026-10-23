@@ -69,7 +69,7 @@ def fundamental_ratios(cur: dict | None, prev: dict | None, close: float | None)
     """Valuation and return ratios. Percentages are returned as e.g. 18.5 for 18.5%."""
     out = dict.fromkeys(
         ["market_cap", "pe", "pb", "roe", "roce", "debt_to_equity", "net_margin",
-         "revenue_growth_yoy", "profit_growth_yoy", "piotroski_f", "altman_z"]
+         "revenue_growth_yoy", "profit_growth_yoy", "piotroski_f", "altman_z", "dividend_yield"]
     )
     if not cur:
         return out
@@ -86,6 +86,9 @@ def fundamental_ratios(cur: dict | None, prev: dict | None, close: float | None)
         out["pe"] = mcap / np_
     if mcap and equity and equity > 0:
         out["pb"] = mcap / equity
+    dividends = cur.get("dividends_paid")
+    if mcap and dividends and dividends > 0:
+        out["dividend_yield"] = dividends / mcap * 100  # trailing: last FY's dividends paid / today's market cap
 
     avg_equity = equity
     if prev and prev.get("total_equity") and equity:

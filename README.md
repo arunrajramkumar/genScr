@@ -12,6 +12,7 @@ A fast, transparent stock screener for NSE-listed companies: search, screen, ana
 | **Market overview** | Breadth (advances/declines, 52W highs and lows), top gainers and losers, most active by turnover, sector heatmap |
 | **Stock page** | Split/bonus-adjusted area or candle chart with 50/200 DMA and OHLC hover readout, signal chips, valuation and return ratios, Piotroski F-score, Altman Z'', RSI, sector peers, annual and quarterly financials |
 | **Did you know?** | Rotating facts per stock computed only from filings, NSE prices and the listing record, each with its source (profit per day, best/worst day, winning streaks, debt-free, sector rank…) |
+| **Price CAGR & dividends** | 1–5 year annualised price growth per stock; trailing dividend yield from the annual cash-flow statement (also in screener and compare) |
 | **What-if calculator** | One-time or monthly SIP, any amount, 1–N years slider: value, gain, CAGR/XIRR, growth chart |
 | **5-year outlook** | Bear/base/bull CAGR *scenarios* from historical price CAGR, profit CAGR and volatility (clearly labelled: not a forecast) |
 | **Screener** | Plain query language (`roe > 18 and debt_to_equity < 0.5`), 6 presets, sortable results, sector filter |

@@ -12,7 +12,7 @@ import { fmtField, toNum } from "@/lib/format";
 import type { CompareResponse } from "@/lib/types";
 
 const ROWS = [
-  "close", "market_cap", "pe", "pb", "roe", "roce", "debt_to_equity", "net_margin", "revenue_growth_yoy",
+  "close", "market_cap", "pe", "pb", "dividend_yield", "roe", "roce", "debt_to_equity", "net_margin", "revenue_growth_yoy",
   "profit_growth_yoy", "piotroski_f", "altman_z", "return_1m", "return_1y", "pct_from_52w_high", "rsi_14",
 ];
 

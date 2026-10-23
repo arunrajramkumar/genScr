@@ -62,7 +62,12 @@ jobs:
           cache-dependency-path: backend/requirements.txt
 
       - name: Install dependencies
-        run: pip install -q -r backend/requirements.txt
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          pip install -q -r backend/requirements.txt
+
+      - name: Apply schema migrations
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f db/init.sql
 
       - name: Stock list and sectors
         if: env.TASK == 'stocks' || env.TASK == 'all'

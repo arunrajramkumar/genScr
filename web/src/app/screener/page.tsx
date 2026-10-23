@@ -10,7 +10,7 @@ import { api } from "@/lib/api";
 import { changeClass, fmtField } from "@/lib/format";
 import type { FieldMeta, Preset, ScreenResponse } from "@/lib/types";
 
-const COLUMNS = ["close", "change_pct", "market_cap", "pe", "roe", "roce", "debt_to_equity", "revenue_growth_yoy", "piotroski_f", "return_1y", "rsi_14"];
+const COLUMNS = ["close", "change_pct", "market_cap", "pe", "dividend_yield", "roe", "roce", "debt_to_equity", "revenue_growth_yoy", "piotroski_f", "return_1y", "rsi_14"];
 
 function Screener() {
   const params = useSearchParams();

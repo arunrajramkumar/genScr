@@ -8,6 +8,7 @@ import { ArrowDownRight, ArrowUpRight, GitCompare } from "lucide-react";
 import AnimatedNumber from "@/components/AnimatedNumber";
 import DidYouKnow from "@/components/DidYouKnow";
 import Outlook from "@/components/Outlook";
+import PriceCagr from "@/components/PriceCagr";
 import { StockChart } from "@/components/PriceChart";
 import ReturnsCalculator from "@/components/ReturnsCalculator";
 import Signals from "@/components/Signals";
@@ -107,10 +108,11 @@ export default function StockPage() {
       </div>
 
       {/* Key stats */}
-      <section className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-7">
         <Stat label="Market cap" value={fmtCr(stock.market_cap)} />
         <Stat label="P/E" value={fmtNum(stock.pe)} />
         <Stat label="P/B" value={fmtNum(stock.pb)} />
+        <Stat label="Dividend yield" value={fmtPct(stock.dividend_yield, false)} sub={toNum(stock.dividend_yield) === null ? "No dividends in last FY" : "Last FY dividends paid"} />
         <Stat label="ROE" value={fmtPct(stock.roe, false)} />
         <Stat label="ROCE" value={fmtPct(stock.roce, false)} />
         <Stat label="Debt / Equity" value={fmtNum(stock.debt_to_equity)} />
@@ -120,7 +122,10 @@ export default function StockPage() {
         <Stat label="1M return" value={<span className={changeClass(stock.return_1m)}>{fmtPct(stock.return_1m)}</span>} />
         <Stat label="1Y return" value={<span className={changeClass(stock.return_1y)}>{fmtPct(stock.return_1y)}</span>} />
         <Stat label="Avg volume" value={fmtVolume(stock.avg_volume_20d)} sub="20 days" />
+        <Stat label="Turnover" value={fmtCr(stock.turnover)} sub="Latest session" />
       </section>
+
+      {prices && prices.length > 0 && <PriceCagr prices={prices} />}
 
       {/* What-if + outlook */}
       {prices && prices.length > 0 && (

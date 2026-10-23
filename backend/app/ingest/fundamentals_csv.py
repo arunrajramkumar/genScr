@@ -15,7 +15,7 @@ from app.ingest.parsers import _int, _num, _parse_date
 NUMERIC = [
     "revenue", "operating_profit", "depreciation", "interest", "pbt", "net_profit", "eps",
     "total_assets", "total_equity", "reserves", "total_debt", "current_assets",
-    "current_liabilities", "cash", "cfo", "capex",
+    "current_liabilities", "cash", "cfo", "capex", "dividends_paid",
 ]
 COLUMNS = ["symbol", "period_end", "period_type", *NUMERIC, "shares_outstanding", "source"]
 

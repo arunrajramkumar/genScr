@@ -21,6 +21,7 @@ XBRL = """<?xml version="1.0" encoding="UTF-8"?>
   <in-capmkt:PaidUpValueOfEquityShareCapital contextRef="FourD" unitRef="INR">9190000000</in-capmkt:PaidUpValueOfEquityShareCapital>
   <in-capmkt:FaceValueOfEquityShareCapital contextRef="FourD" unitRef="INRPerShare">1</in-capmkt:FaceValueOfEquityShareCapital>
   <in-capmkt:CashFlowsFromUsedInOperatingActivities contextRef="FourD" unitRef="INR">6320000000</in-capmkt:CashFlowsFromUsedInOperatingActivities>
+  <in-capmkt:DividendsPaidClassifiedAsFinancingActivities contextRef="FourD" unitRef="INR">-12500000000</in-capmkt:DividendsPaidClassifiedAsFinancingActivities>
   <in-capmkt:Assets contextRef="OneI" unitRef="INR">407360000000</in-capmkt:Assets>
   <in-capmkt:EquityAttributableToOwnersOfParent contextRef="OneI" unitRef="INR">309800000000</in-capmkt:EquityAttributableToOwnersOfParent>
   <in-capmkt:BorrowingsCurrent contextRef="OneI" unitRef="INR">0</in-capmkt:BorrowingsCurrent>
@@ -42,6 +43,8 @@ def test_march_filing_yields_quarter_and_full_year():
     assert fy["total_equity"] == pytest.approx(30980)
     assert fy["total_debt"] == 0
     assert fy["eps"] == 0.4
+    assert fy["dividends_paid"] == pytest.approx(1250)  # sign normalised
+    assert q["dividends_paid"] is None
 
 
 def test_non_march_filing_has_no_fy_row():

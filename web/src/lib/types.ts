@@ -25,6 +25,7 @@ export interface Metrics {
   profit_growth_yoy: Num;
   piotroski_f: Num;
   altman_z: Num;
+  dividend_yield: Num;
 }
 
 export interface Stock extends Partial<Metrics> {

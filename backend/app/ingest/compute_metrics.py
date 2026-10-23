@@ -16,7 +16,7 @@ COLUMNS = [
     "symbol", "as_of", "close", "change_pct", "high_52w", "low_52w", "pct_from_52w_high",
     "return_1m", "return_1y", "avg_volume_20d", "turnover", "rsi_14", "sma_50", "sma_200",
     "market_cap", "pe", "pb", "roe", "roce", "debt_to_equity", "net_margin",
-    "revenue_growth_yoy", "profit_growth_yoy", "piotroski_f", "altman_z",
+    "revenue_growth_yoy", "profit_growth_yoy", "piotroski_f", "altman_z", "dividend_yield",
 ]
 
 UPSERT = f"""

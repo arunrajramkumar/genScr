@@ -60,6 +60,7 @@ def _income_statement(facts: dict, ctx: str) -> dict:
     else:
         operating_profit = _first(facts, ctx, "OperatingProfitBeforeProvisionAndContingencies")
 
+    dividends = _first(facts, ctx, "DividendsPaidClassifiedAsFinancingActivities")  # cash outflow; sign varies
     paid_up = _first(facts, ctx, "PaidUpValueOfEquityShareCapital")
     face = _first(facts, ctx, "FaceValueOfEquityShareCapital")
     return {
@@ -85,6 +86,7 @@ def _income_statement(facts: dict, ctx: str) -> dict:
             "PurchaseOfPropertyPlantAndEquipmentClassifiedAsInvestingActivities",
             "PurchaseOfTangibleAssetsClassifiedAsInvestingActivities",
         )),
+        "dividends_paid": _cr(abs(dividends) if dividends is not None else None),
         "shares_outstanding": int(paid_up / face) if paid_up and face else None,
     }
 
@@ -120,7 +122,7 @@ def parse_results(xml_text: str, symbol: str, period_end: date, source: str) -> 
     quarter = _income_statement(facts, "OneD")
     if quarter["revenue"] is not None or quarter["net_profit"] is not None:
         # Quarterly cash flow is rarely reported; keep Q rows to P&L + balance sheet.
-        rows.append({**quarter, **balance, "cfo": None, "capex": None,
+        rows.append({**quarter, **balance, "cfo": None, "capex": None, "dividends_paid": None,
                      "symbol": symbol, "period_end": period_end, "period_type": "Q", "source": source})
 
     if period_end.month == 3:

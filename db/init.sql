@@ -67,6 +67,7 @@ CREATE TABLE IF NOT EXISTS fundamentals (
     cash                 NUMERIC(18, 2),
     cfo                  NUMERIC(18, 2),
     capex                NUMERIC(18, 2),
+    dividends_paid       NUMERIC(18, 2),
     shares_outstanding   BIGINT,
     source               TEXT,
     PRIMARY KEY (symbol, period_end, period_type)
@@ -99,6 +100,11 @@ CREATE TABLE IF NOT EXISTS stock_metrics (
     profit_growth_yoy   NUMERIC(10, 2),
     piotroski_f         SMALLINT,
     altman_z            NUMERIC(8, 2),
+    dividend_yield      NUMERIC(8, 2),
     updated_at          TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS stock_metrics_mcap_idx ON stock_metrics (market_cap DESC NULLS LAST);
+
+-- Migrations for databases created before these columns existed (safe to re-run).
+ALTER TABLE fundamentals  ADD COLUMN IF NOT EXISTS dividends_paid NUMERIC(18, 2);
+ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS dividend_yield NUMERIC(8, 2);

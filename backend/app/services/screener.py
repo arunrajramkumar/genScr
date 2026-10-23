@@ -12,6 +12,7 @@ FIELDS: dict[str, dict] = {
     "change_pct": {"label": "Day Change", "unit": "%", "higher_is_better": True},
     "pe": {"label": "P/E", "unit": "x", "higher_is_better": False},
     "pb": {"label": "P/B", "unit": "x", "higher_is_better": False},
+    "dividend_yield": {"label": "Dividend Yield", "unit": "%", "higher_is_better": True},
     "roe": {"label": "ROE", "unit": "%", "higher_is_better": True},
     "roce": {"label": "ROCE", "unit": "%", "higher_is_better": True},
     "debt_to_equity": {"label": "Debt / Equity", "unit": "x", "higher_is_better": False},
@@ -31,6 +32,7 @@ FIELDS: dict[str, dict] = {
 ALIASES = {
     "mcap": "market_cap", "marketcap": "market_cap", "price": "close", "ltp": "close",
     "de": "debt_to_equity", "d/e": "debt_to_equity", "debt": "debt_to_equity",
+    "dy": "dividend_yield", "yield": "dividend_yield",
     "rsi": "rsi_14", "piotroski": "piotroski_f", "fscore": "piotroski_f", "z": "altman_z",
     "sales_growth": "revenue_growth_yoy", "profit_growth": "profit_growth_yoy",
 }
@@ -48,6 +50,8 @@ PRESETS = [
      "query": "pct_from_52w_high > -5 and return_1y > 30 and rsi_14 < 75"},
     {"id": "safe", "name": "Fortress Balance Sheets", "description": "Low bankruptcy risk, strong F-score",
      "query": "altman_z > 2.6 and debt_to_equity < 0.3 and piotroski_f >= 7"},
+    {"id": "dividend", "name": "Dividend Payers", "description": "3%+ yield with a healthy balance sheet",
+     "query": "dividend_yield > 3 and debt_to_equity < 1 and market_cap > 1000"},
     {"id": "oversold", "name": "Oversold Large Caps", "description": "RSI below 30, market cap above ₹5,000 Cr",
      "query": "rsi_14 < 30 and market_cap > 5000"},
 ]
