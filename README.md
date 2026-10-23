@@ -87,6 +87,16 @@ Or load your own CSV in the `data/fundamentals_template.csv` format: `make funda
 
 ## Deploying
 
+**Seed the hosted database from your local one.** Don't backfill from scratch in the cloud: it takes hours, and NSE often blocks datacenter IPs.
+
+```bash
+make export-data                                     # local db -> data/export/*.csv.gz (~60 MB)
+make import-data TARGET_URL='postgresql://…?sslmode=require'   # schema + data into the hosted db (needs psql)
+```
+
+After seeding, the scheduler only adds each new trading day (`bhavcopy.load_latest` skips dates already loaded). Run the quarterly fundamentals refresh (`app.ingest.results --skip-existing`) from your own machine with `DATABASE_URL` pointed at the hosted database, because NSE's website API tends to reject cloud IPs.
+
+
 - **Web:** Vercel (set `NEXT_PUBLIC_API_URL`)
 - **API + scheduler:** Render / Railway / Fly.io (or AWS `ap-south-1`), built from `backend/Dockerfile`
 - **DB:** Timescale Cloud, or any Postgres with the TimescaleDB extension

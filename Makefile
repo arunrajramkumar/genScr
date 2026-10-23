@@ -1,7 +1,7 @@
 COMPOSE := docker compose
 RUN := $(COMPOSE) run --rm api python -m
 
-.PHONY: up down logs ingest backfill metrics fundamentals test lint dev-api dev-web
+.PHONY: up down logs ingest backfill metrics fundamentals export-data import-data test lint dev-api dev-web
 
 up:            ## Start db, api, scheduler and web
 	$(COMPOSE) up -d --build
@@ -27,6 +27,12 @@ metrics:
 fundamentals:  ## make fundamentals FILE=data/my_fundamentals.csv
 	$(COMPOSE) run --rm -v $(PWD)/data:/app/data api python -m app.ingest.fundamentals_csv $(FILE)
 	$(RUN) app.ingest.compute_metrics
+
+export-data:   ## Dump all tables to data/export/*.csv.gz
+	scripts/export_data.sh
+
+import-data:   ## make import-data TARGET_URL='postgresql://...'  (replaces table contents)
+	TARGET_URL='$(TARGET_URL)' scripts/import_data.sh
 
 test:
 	cd backend && python -m pytest -q
