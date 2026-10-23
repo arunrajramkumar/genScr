@@ -101,6 +101,8 @@ make import-data TARGET_URL='postgresql://…?sslmode=require'   # schema + data
 
 The runner downloads everything from NSE into a temporary Postgres, computes the metrics, then copies the tables into Render. Expect ~40 min for prices since 2021, plus ~2 h for Nifty 500 fundamentals.
 
+**Keeping it fresh for free:** the **Data update** workflow (`.github/workflows/daily-update.yml`) runs on GitHub's schedule using the same `RENDER_DATABASE_URL` secret: prices + metrics at 20:00 IST Mon–Fri (retry at 22:00), stock list on Sundays, results filings monthly. You can also run it by hand from the Actions tab.
+
 After seeding, the scheduler only adds each new trading day (`bhavcopy.load_latest` skips dates already loaded). Run the quarterly fundamentals refresh (`app.ingest.results --skip-existing`) from your own machine with `DATABASE_URL` pointed at the hosted database, because NSE's website API tends to reject cloud IPs.
 
 

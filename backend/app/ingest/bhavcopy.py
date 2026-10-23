@@ -81,6 +81,7 @@ def main():
     p.add_argument("--from", dest="start", type=date.fromisoformat)
     p.add_argument("--to", dest="end", type=date.fromisoformat)
     p.add_argument("--skip-existing", action="store_true")
+    p.add_argument("--lookback", type=int, default=5, help="Days to check when loading the latest (default 5)")
     a = p.parse_args()
 
     if a.date:
@@ -88,7 +89,7 @@ def main():
     elif a.start:
         load_range(a.start, a.end or ist_today(), a.skip_existing)
     else:
-        load_latest()
+        load_latest(a.lookback)
 
 
 if __name__ == "__main__":

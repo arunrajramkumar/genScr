@@ -1,0 +1,103 @@
+name: Data update
+
+# Keeps the hosted database fresh (replaces Render cron jobs on the free plan).
+# Connects straight to the hosted Postgres using the RENDER_DATABASE_URL secret.
+# GitHub cron is in UTC and can start a few minutes late at busy times.
+
+on:
+  schedule:
+    - cron: "30 14 * * 1-5" # 20:00 IST Mon-Fri: today's bhavcopy + metrics
+    - cron: "30 16 * * 1-5" # 22:00 IST retry in case NSE published late (already-loaded days are skipped)
+    - cron: "30 3 * * 0" # 09:00 IST Sunday: stock list + sectors
+    - cron: "30 20 1 * *" # 02:00 IST on the 2nd: latest results filings
+  workflow_dispatch:
+    inputs:
+      task:
+        description: What to update
+        type: choice
+        options: [prices, stocks, fundamentals, all]
+        default: prices
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-db # never overlaps with the seed workflow
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    steps:
+      - name: Pick task and connect
+        env:
+          SCHEDULE: ${{ github.event.schedule }}
+          INPUT_TASK: ${{ inputs.task }}
+          DB_URL: ${{ secrets.RENDER_DATABASE_URL }}
+        run: |
+          case "$SCHEDULE" in
+            "30 3 * * 0")  task=stocks ;;
+            "30 20 1 * *") task=fundamentals ;;
+            "")            task="${INPUT_TASK:-prices}" ;;
+            *)             task=prices ;;
+          esac
+          echo "Task: $task"
+          echo "TASK=$task" >> "$GITHUB_ENV"
+          [ -n "$DB_URL" ] || { echo "::error::Add the RENDER_DATABASE_URL repository secret."; exit 1; }
+          case "$DB_URL" in
+            *sslmode=*) url="$DB_URL" ;;
+            *\?*)       url="$DB_URL&sslmode=require" ;;
+            *)          url="$DB_URL?sslmode=require" ;;
+          esac
+          echo "::add-mask::$url"
+          echo "DATABASE_URL=$url" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -q -r backend/requirements.txt
+
+      - name: Stock list and sectors
+        if: env.TASK == 'stocks' || env.TASK == 'all'
+        working-directory: backend
+        run: python -u -m app.ingest.equity_list
+
+      - name: Latest daily prices
+        if: env.TASK == 'prices' || env.TASK == 'all'
+        working-directory: backend
+        run: python -u -m app.ingest.bhavcopy --lookback 10
+
+      - name: Latest results filings (Nifty 500)
+        if: env.TASK == 'fundamentals' || env.TASK == 'all'
+        continue-on-error: true # NSE may refuse cloud IPs; metrics still run
+        timeout-minutes: 200
+        working-directory: backend
+        run: python -u -m app.ingest.results --universe nifty500 --years 1 --quarters 2
+
+      - name: Compute metrics
+        working-directory: backend
+        run: python -u -m app.ingest.compute_metrics
+
+      - name: Summary
+        if: always()
+        working-directory: backend
+        run: |
+          python - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          from app.db import connect
+          with connect() as c:
+              p = c.execute("SELECT max(trade_date) AS d, count(*) AS n FROM prices").fetchone()
+              m = c.execute("SELECT max(as_of) AS d, count(*) AS n FROM stock_metrics").fetchone()
+              f = c.execute("SELECT max(period_end) AS d, count(DISTINCT symbol) AS n FROM fundamentals").fetchone()
+          print("### Hosted database")
+          print("| Table | Latest | Rows / symbols |\n|---|---|---|")
+          print(f"| prices | {p['d']} | {p['n']:,} |")
+          print(f"| stock_metrics | {m['d']} | {m['n']:,} |")
+          print(f"| fundamentals | {f['d']} | {f['n']} companies |")
+          EOF

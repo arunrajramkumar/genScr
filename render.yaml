@@ -4,8 +4,8 @@
 # FREE-TIER SETUP for trying things out:
 #   - free web services sleep after ~15 min idle (first request then takes ~50s)
 #   - free Postgres is time-limited by Render; upgrade before it expires
-#   - cron jobs aren't available on free plans; run the daily update from your machine:
-#       DATABASE_URL='<external url>' python -m app.ingest.bhavcopy && python -m app.ingest.compute_metrics
+#   - cron jobs aren't available on free plans; the GitHub Actions "Data update" workflow
+#     (.github/workflows/daily-update.yml) does the daily/weekly/monthly refresh instead
 #
 # To go production: change `plan: free` to `starter` (services) / `basic-256mb` (database),
 # and uncomment the cron jobs at the bottom.
