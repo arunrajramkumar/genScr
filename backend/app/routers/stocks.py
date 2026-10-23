@@ -4,6 +4,7 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.cache import cached
 from app.db import get_conn
 from app.services.adjust import adjust
 from app.services.facts import build_facts
@@ -22,6 +23,7 @@ def normalize_symbol(symbol: str) -> str:
 
 
 @router.get("/{symbol}")
+@cached(maxsize=512)
 def get_stock(symbol: str, conn=Depends(get_conn)):
     symbol = normalize_symbol(symbol)
     row = conn.execute(
@@ -38,6 +40,7 @@ def get_stock(symbol: str, conn=Depends(get_conn)):
 
 
 @router.get("/{symbol}/prices")
+@cached(maxsize=150)  # ~130 KB each -> ~20 MB worst case
 def get_prices(
     symbol: str,
     range: Literal["1m", "6m", "1y", "3y", "5y", "max"] = "1y",
@@ -53,8 +56,7 @@ def get_prices(
         """,
         (symbol, since),
     ).fetchall()
-    rows = adjust([{k: float(v) if k in ("open", "high", "low", "close", "prev_close") and v is not None else v
-                    for k, v in r.items()} for r in rows])
+    rows = adjust(rows)
     return [
         {"time": r["trade_date"].isoformat(), **{k: round(r[k], 2) if r[k] is not None else None
                                                for k in ("open", "high", "low", "close")}, "volume": r["volume"]}
@@ -63,6 +65,7 @@ def get_prices(
 
 
 @router.get("/{symbol}/fundamentals")
+@cached(maxsize=512)
 def get_fundamentals(
     symbol: str,
     period: Literal["FY", "Q"] = "FY",
@@ -81,6 +84,7 @@ def get_fundamentals(
 
 
 @router.get("/{symbol}/peers")
+@cached(maxsize=512)
 def get_peers(symbol: str, limit: int = Query(8, ge=1, le=20), conn=Depends(get_conn)):
     symbol = normalize_symbol(symbol)
     return conn.execute(
@@ -96,6 +100,7 @@ def get_peers(symbol: str, limit: int = Query(8, ge=1, le=20), conn=Depends(get_
 
 
 @router.get("/{symbol}/facts")
+@cached(maxsize=512)
 def get_facts(symbol: str, conn=Depends(get_conn)):
     symbol = normalize_symbol(symbol)
     stock = conn.execute(

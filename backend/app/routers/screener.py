@@ -3,6 +3,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from app.cache import cached
 from app.db import get_conn
 from app.services import screener
 
@@ -25,6 +26,7 @@ class ScreenRequest(BaseModel):
 
 
 @router.post("")
+@cached(maxsize=300, max_age=0)
 def run_screen(req: ScreenRequest, conn=Depends(get_conn)):
     try:
         filters = [f.model_dump() for f in req.filters]
@@ -38,10 +40,12 @@ def run_screen(req: ScreenRequest, conn=Depends(get_conn)):
 
 
 @router.get("/fields")
+@cached(ttl=86400, maxsize=1, max_age=86400)
 def fields():
     return screener.FIELDS
 
 
 @router.get("/presets")
+@cached(ttl=86400, maxsize=1, max_age=86400)
 def presets():
     return screener.PRESETS

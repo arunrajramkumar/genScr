@@ -3,6 +3,7 @@ from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from app.cache import cached
 from app.db import get_conn
 from app.routers.stocks import normalize_symbol
 from app.services.screener import FIELDS
@@ -11,6 +12,7 @@ router = APIRouter(tags=["compare"])
 
 
 @router.get("/compare")
+@cached(maxsize=200)
 def compare(symbols: str = Query(..., description="Comma-separated, 2 to 5 symbols"), conn=Depends(get_conn)):
     syms = list(dict.fromkeys(normalize_symbol(s) for s in symbols.split(",") if s.strip()))
     if not 2 <= len(syms) <= 5:

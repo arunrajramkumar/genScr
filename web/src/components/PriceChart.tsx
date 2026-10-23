@@ -5,6 +5,7 @@ import clsx from "clsx";
 import { ColorType, CrosshairMode, createChart, type IChartApi, type Time } from "lightweight-charts";
 import { changeClass, fmtPct, fmtPrice, fmtVolume } from "@/lib/format";
 import { movingAverage } from "@/lib/returns";
+import { LINE_COLORS } from "./chartColors";
 import type { Candle } from "@/lib/types";
 
 const UP = "#00d47e";
@@ -130,8 +131,6 @@ export function StockChart({ data }: { data: Candle[] }) {
     </div>
   );
 }
-
-export const LINE_COLORS = ["#7c9cff", "#00d47e", "#f5b942", "#ec4899", "#06b6d4"];
 
 export function CompareChart({ series }: { series: Record<string, { time: string; value: number }[]> }) {
   const ref = useRef<HTMLDivElement>(null);

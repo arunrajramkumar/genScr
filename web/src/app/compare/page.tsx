@@ -4,12 +4,15 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import clsx from "clsx";
-import { CompareChart, LINE_COLORS } from "@/components/PriceChart";
+import dynamic from "next/dynamic";
+import { LINE_COLORS } from "@/components/chartColors";
 import { SectionNote } from "@/components/Legal";
 import { ErrorNote, Loading } from "@/components/ui";
 import { api } from "@/lib/api";
 import { fmtField, toNum } from "@/lib/format";
 import type { CompareResponse } from "@/lib/types";
+
+const CompareChart = dynamic(() => import("@/components/PriceChart").then((m) => m.CompareChart), { ssr: false, loading: () => <Loading /> });
 
 const ROWS = [
   "close", "market_cap", "pe", "pb", "dividend_yield", "roe", "roce", "debt_to_equity", "net_margin", "revenue_growth_yoy",

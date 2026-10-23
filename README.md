@@ -101,6 +101,8 @@ genScr is built to stay an **information tool**, not an adviser (SEBI Research A
 
 ## Deploying
 
+**Free-tier layout (fast and cheap):** the website is a **static export** (`STATIC_EXPORT=1`) on a Render Static Site: global CDN, never sleeps, no instance hours. Only the API is a (free) instance; point a free uptime monitor (e.g. UptimeRobot, 5-minute interval) at `/api/health` to keep it warm. The API caches finished JSON responses in memory and clears them automatically when the nightly data update lands.
+
 **Seed the hosted database from your local one.** Don't backfill from scratch in the cloud: it takes hours, and NSE often blocks datacenter IPs.
 
 ```bash

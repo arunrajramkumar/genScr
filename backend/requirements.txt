@@ -3,5 +3,6 @@ uvicorn[standard]>=0.32
 psycopg[binary,pool]>=3.2
 pydantic-settings>=2.7
 httpx>=0.28
+orjson>=3.10
 apscheduler>=3.11,<4
 tzdata>=2024.2

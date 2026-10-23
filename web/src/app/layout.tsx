@@ -3,6 +3,7 @@ import { Inter, JetBrains_Mono } from "next/font/google";
 import Link from "next/link";
 import { DisclaimerNotice } from "@/components/Legal";
 import Navbar from "@/components/Navbar";
+import { API_URL } from "@/lib/api";
 import { DATA_SOURCES, DISCLAIMER, SITE_NAME } from "@/lib/site";
 import "./globals.css";
 
@@ -17,6 +18,11 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+      <head>
+        {/* Open the API connection (DNS + TLS) while the page is still loading. */}
+        <link rel="preconnect" href={API_URL} crossOrigin="anonymous" />
+        <link rel="dns-prefetch" href={API_URL} />
+      </head>
       <body className="min-h-screen font-sans">
         <Navbar />
         <main className="mx-auto max-w-7xl px-4 py-8">{children}</main>

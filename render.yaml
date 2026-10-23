@@ -2,7 +2,8 @@
 # Render will prompt for values marked `sync: false`.
 #
 # FREE-TIER SETUP for trying things out:
-#   - free web services sleep after ~15 min idle (first request then takes ~50s)
+#   - the website is a free static site (CDN, never sleeps); the free API sleeps after ~15 min idle
+#     (first request then takes ~50s) - an uptime monitor pinging /api/health keeps it warm
 #   - free Postgres is time-limited by Render; upgrade before it expires
 #   - cron jobs aren't available on free plans; the GitHub Actions "Data update" workflow
 #     (.github/workflows/daily-update.yml) does the daily/weekly/monthly refresh instead
@@ -30,19 +31,45 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase: { name: genscr-db, property: connectionString }
-      - key: CORS_ORIGINS # e.g. https://genscr-web.onrender.com (later https://dalallens.in,https://www.dalallens.in)
+      - key: CORS_ORIGINS # e.g. https://genscr-site.onrender.com (later your domain)
         sync: false
 
+  # Static site: served from Render's global CDN, free, never sleeps, no instance hours.
   - type: web
-    name: genscr-web
-    runtime: docker
-    region: singapore
-    plan: free
-    dockerfilePath: ./web/Dockerfile
-    dockerContext: ./web
+    name: genscr-site
+    runtime: static
+    buildCommand: cd web && npm install --no-audit --no-fund && npm run build
+    staticPublishPath: ./web/out
     buildFilter:
       paths: ["web/**"]
+    routes:
+      - type: rewrite # one prebuilt shell serves every /stock/<SYMBOL>
+        source: /stock/*
+        destination: /stock/_/index.html
+    headers:
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
+      - path: /*
+        name: Permissions-Policy
+        value: camera=(), microphone=(), geolocation=(), payment=()
+      - path: /*
+        name: Strict-Transport-Security
+        value: max-age=31536000; includeSubDomains
+      - path: /_next/static/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
     envVars:
+      - key: STATIC_EXPORT
+        value: "1"
+      - key: NODE_VERSION
+        value: "20"
       - key: NEXT_PUBLIC_API_URL # e.g. https://genscr-api.onrender.com (baked in at build time; redeploy after changing)
         sync: false
       - key: NEXT_PUBLIC_SITE_NAME

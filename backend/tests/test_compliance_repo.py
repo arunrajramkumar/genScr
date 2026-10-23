@@ -62,7 +62,7 @@ def test_legal_pages_exist_with_key_sections(page, phrases):
 def test_return_projections_are_off_by_default_and_gated():
     site = _read("web/src/lib/site.ts")
     assert 'ENABLE_PROJECTIONS = process.env.NEXT_PUBLIC_ENABLE_PROJECTIONS === "true"' in site
-    stock_page = _read("web/src/app/stock/[symbol]/page.tsx")
+    stock_page = _read("web/src/app/stock/[symbol]/StockView.tsx")
     assert "<Outlook" in stock_page
     for line in stock_page.splitlines():
         if "<Outlook" in line:
@@ -81,7 +81,7 @@ def test_analytics_sections_have_inline_notes():
     assert "not stock picks or recommendations" in _read("web/src/app/screener/page.tsx")
     assert "not a ranking or a recommendation" in _read("web/src/app/compare/page.tsx")
     assert "not investment advice" in _read("web/src/components/DidYouKnow.tsx")
-    assert "<StaleDataBanner" in _read("web/src/app/stock/[symbol]/page.tsx")
+    assert "<StaleDataBanner" in _read("web/src/app/stock/[symbol]/StockView.tsx")
 
 
 def test_technical_states_are_not_colour_coded_as_buy_or_sell():
@@ -92,7 +92,14 @@ def test_technical_states_are_not_colour_coded_as_buy_or_sell():
             assert 'tone: "neutral"' in line, line
 
 
-def test_web_security_headers_configured():
-    cfg = _read("web/next.config.mjs")
+@pytest.mark.parametrize("config", ["web/next.config.mjs", "render.yaml"])
+def test_web_security_headers_configured(config):
+    cfg = _read(config)
     for header in ["X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy", "Strict-Transport-Security"]:
+        assert header in cfg, f"{config} must set {header}"
+
+
+def test_nginx_sets_security_headers():
+    cfg = _read("web/nginx.conf")
+    for header in ["X-Content-Type-Options", "X-Frame-Options", "Referrer-Policy"]:
         assert header in cfg

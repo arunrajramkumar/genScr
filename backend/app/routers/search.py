@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, Query
 
+from app.cache import cached
 from app.db import get_conn
 
 router = APIRouter(tags=["search"])
@@ -10,6 +11,7 @@ def _escape_like(text: str) -> str:
 
 
 @router.get("/search")
+@cached(maxsize=1024)
 def search(
     q: str = Query(..., min_length=1, max_length=50),
     limit: int = Query(10, ge=1, le=25),

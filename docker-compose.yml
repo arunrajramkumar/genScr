@@ -35,7 +35,7 @@ services:
       db:
         condition: service_healthy
 
-  web:
+  web: # static export served by nginx
     build:
       context: ./web
       args:

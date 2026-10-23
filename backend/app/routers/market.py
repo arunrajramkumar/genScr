@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends
 
+from app.cache import cached
 from app.db import get_conn
 
 router = APIRouter(prefix="/market", tags=["market"])
@@ -13,6 +14,7 @@ _LIST = """
 
 
 @router.get("/overview")
+@cached(maxsize=4)
 def overview(conn=Depends(get_conn)):
     as_of = conn.execute("SELECT max(as_of) AS d FROM stock_metrics").fetchone()["d"]
     if as_of is None:
