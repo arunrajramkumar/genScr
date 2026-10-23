@@ -1,22 +1,30 @@
 name: Seed hosted database
 
-# Manual, one-off: loads the CSV export (scripts/export_data.sh) attached to a GitHub Release
-# into the hosted Postgres. Runs on GitHub's runners, so it works even when your own network
-# blocks direct database connections.
+# Manual, one-off: builds the whole dataset from NSE on a fresh GitHub runner and loads it into
+# the hosted Postgres. Nothing is uploaded from your machine.
 #
-# Setup:
-#   1. Repo → Settings → Secrets and variables → Actions → New repository secret
-#        RENDER_DATABASE_URL = Render "External Database URL"
-#   2. Repo → Releases → Draft a new release, tag e.g. data-latest, attach data/export/*.csv.gz
-#   3. Actions → Seed hosted database → Run workflow (type REPLACE to confirm)
+#   NSE stock list + sectors ─┐
+#   NSE daily bhavcopy files ─┼─► temporary Postgres on the runner ─► compute metrics ─► export ─► Render DB
+#   Company results (XBRL) ───┘
+#
+# Setup: Repo → Settings → Secrets and variables → Actions → New repository secret
+#          RENDER_DATABASE_URL = Render "External Database URL"
+# Run:   Actions → Seed hosted database → Run workflow (type REPLACE to confirm)
+#
+# Takes ~40 min for prices since 2021, plus ~2 h for Nifty 500 fundamentals.
 
 on:
   workflow_dispatch:
     inputs:
-      release_tag:
-        description: Release tag that holds the *.csv.gz export files
+      since:
+        description: Load daily prices from this date (YYYY-MM-DD)
         required: true
-        default: data-latest
+        default: "2021-01-01"
+      fundamentals:
+        description: Company financials to load from results filings
+        type: choice
+        options: [nifty500, none]
+        default: nifty500
       confirm:
         description: Type REPLACE to overwrite the hosted database tables
         required: true
@@ -31,46 +39,88 @@ concurrency:
 jobs:
   seed:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 330
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: genscr
+          POSTGRES_PASSWORD: genscr
+          POSTGRES_DB: genscr
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U genscr" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://genscr:genscr@localhost:5432/genscr
+      SINCE: ${{ inputs.since }}
     steps:
       - name: Check inputs and secret
         env:
           CONFIRM: ${{ inputs.confirm }}
-          TARGET_URL: ${{ secrets.RENDER_DATABASE_URL }}
-        run: |
-          if [ "$CONFIRM" != "REPLACE" ]; then
-            echo "::error::Type REPLACE in the 'confirm' input to run this workflow."; exit 1
-          fi
-          if [ -z "$TARGET_URL" ]; then
-            echo "::error::Add the RENDER_DATABASE_URL repository secret (Render External Database URL)."; exit 1
-          fi
-
-      - uses: actions/checkout@v4
-
-      - name: Install PostgreSQL client
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
-
-      - name: Download export files from the release
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ inputs.release_tag }}
-        run: |
-          mkdir -p data/export
-          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.csv.gz' --dir data/export
-          ls -lh data/export
-          for t in stocks prices fundamentals stock_metrics; do
-            [ -f "data/export/$t.csv.gz" ] || { echo "::error::Release $RELEASE_TAG is missing $t.csv.gz"; exit 1; }
-          done
-
-      - name: Import into the hosted database
-        env:
           DB_URL: ${{ secrets.RENDER_DATABASE_URL }}
         run: |
+          [ "$CONFIRM" = "REPLACE" ] || { echo "::error::Type REPLACE in the 'confirm' input to run this workflow."; exit 1; }
+          [ -n "$DB_URL" ] || { echo "::error::Add the RENDER_DATABASE_URL repository secret (Render External Database URL)."; exit 1; }
+          [[ "$SINCE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo "::error::'since' must look like 2021-01-01"; exit 1; }
           # Render's external connections require SSL.
           case "$DB_URL" in
             *sslmode=*) TARGET_URL="$DB_URL" ;;
             *\?*)       TARGET_URL="$DB_URL&sslmode=require" ;;
             *)          TARGET_URL="$DB_URL?sslmode=require" ;;
           esac
-          export TARGET_URL
+          echo "::add-mask::$TARGET_URL"
+          echo "TARGET_URL=$TARGET_URL" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+          pip install -q -r backend/requirements.txt
+
+      - name: Check the hosted database is reachable
+        run: psql "$TARGET_URL" -v ON_ERROR_STOP=1 -qAt -c "SELECT 'Render database reachable'"
+
+      - name: Create schema (temporary database)
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -f db/init.sql
+
+      - name: Stock list and sectors
+        working-directory: backend
+        run: python -u -m app.ingest.equity_list
+
+      - name: Daily prices since ${{ inputs.since }}
+        working-directory: backend
+        run: python -u -m app.ingest.bhavcopy --from "$SINCE"
+
+      - name: Fundamentals from results filings
+        if: inputs.fundamentals != 'none'
+        continue-on-error: true # NSE may refuse cloud IPs; prices are still loaded
+        working-directory: backend
+        run: python -u -m app.ingest.results --universe ${{ inputs.fundamentals }}
+
+      - name: Compute metrics
+        working-directory: backend
+        run: python -u -m app.ingest.compute_metrics
+
+      - name: Copy everything into the hosted database
+        run: |
+          SOURCE_URL="$DATABASE_URL" scripts/export_data.sh
           scripts/import_data.sh
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "### Hosted database contents"
+            echo '| Table | Rows |'
+            echo '|---|---|'
+            for t in stocks prices fundamentals stock_metrics; do
+              echo "| $t | $(psql "$TARGET_URL" -At -c "SELECT count(*) FROM $t" 2>/dev/null || echo '?') |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"

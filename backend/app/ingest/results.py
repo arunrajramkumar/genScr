@@ -23,6 +23,8 @@ from app.ingest.xbrl import parse_results
 SITE = "https://www.nseindia.com"
 LEGACY_INDEX = SITE + "/api/corporates-financial-results?index=equities&symbol={symbol}&period={period}"
 INTEGRATED_INDEX = SITE + "/api/integrated-filing-results?symbol={symbol}&type=Integrated%20Filing-%20Financials"
+MAX_CONSECUTIVE_FAILURES = 15
+
 BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/129.0 Safari/537.36"
 
 
@@ -136,17 +138,21 @@ def main():
             symbols = [s for s in symbols if s not in done]
 
         nse = NseClient()
-        ok = failed = 0
+        ok = failed = streak = 0
         try:
             for i, symbol in enumerate(symbols, 1):
                 try:
                     n = load_symbol(nse, conn, symbol, a.years, a.quarters)
                     ok += 1
+                    streak = 0
                     print(f"[{i}/{len(symbols)}] {symbol}: {n} rows", flush=True)
                 except Exception as e:  # keep going; one bad filing shouldn't stop the batch
                     conn.rollback()
                     failed += 1
+                    streak += 1
                     print(f"[{i}/{len(symbols)}] {symbol}: FAILED {type(e).__name__}: {e}", flush=True)
+                    if streak >= MAX_CONSECUTIVE_FAILURES:
+                        raise SystemExit(f"Stopping: {streak} failures in a row (NSE is probably blocking this network).") from e
         finally:
             nse.close()
     print(f"done: {ok} ok, {failed} failed. Now run: python -m app.ingest.compute_metrics")

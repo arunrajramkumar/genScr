@@ -94,11 +94,12 @@ make export-data                                     # local db -> data/export/*
 make import-data TARGET_URL='postgresql://…?sslmode=require'   # schema + data into the hosted db (needs psql)
 ```
 
-**Can't reach the database from your network** (e.g. a corporate proxy)? Seed it from GitHub Actions instead:
+**Can't reach the database from your network** (e.g. a corporate proxy)? Let GitHub Actions build and load it. Nothing is uploaded from your machine:
 
 1. Repo → Settings → Secrets and variables → Actions → add `RENDER_DATABASE_URL` (Render's External Database URL).
-2. `make export-data SINCE=2021-01-01`, then create a GitHub Release (tag `data-latest`) and attach the four `data/export/*.csv.gz` files.
-3. Actions → **Seed hosted database** → Run workflow → type `REPLACE`.
+2. Actions → **Seed hosted database** → Run workflow → pick the start date and fundamentals, then type `REPLACE`.
+
+The runner downloads everything from NSE into a temporary Postgres, computes the metrics, then copies the tables into Render. Expect ~40 min for prices since 2021, plus ~2 h for Nifty 500 fundamentals.
 
 After seeding, the scheduler only adds each new trading day (`bhavcopy.load_latest` skips dates already loaded). Run the quarterly fundamentals refresh (`app.ingest.results --skip-existing`) from your own machine with `DATABASE_URL` pointed at the hosted database, because NSE's website API tends to reject cloud IPs.
 
