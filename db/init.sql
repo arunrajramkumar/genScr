@@ -1,7 +1,12 @@
 -- genScr schema. Runs automatically on first `docker compose up` (empty volume).
 -- Money values in fundamentals / metrics are in ₹ crore unless noted.
 
-CREATE EXTENSION IF NOT EXISTS timescaledb;
+-- TimescaleDB is optional: plain Postgres (Neon, Supabase, Homebrew) works, just without hypertables.
+DO $$ BEGIN
+    CREATE EXTENSION IF NOT EXISTS timescaledb;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'TimescaleDB not available; prices will be a plain table';
+END $$;
 CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- Master list of listed equities (from NSE EQUITY_L.csv + index constituent files for sector).
@@ -34,7 +39,11 @@ CREATE TABLE IF NOT EXISTS prices (
     trades      BIGINT,
     PRIMARY KEY (symbol, trade_date)
 );
-SELECT create_hypertable('prices', 'trade_date', if_not_exists => TRUE, migrate_data => TRUE);
+DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'timescaledb') THEN
+        PERFORM create_hypertable('prices', 'trade_date', if_not_exists => TRUE, migrate_data => TRUE);
+    END IF;
+END $$;
 CREATE INDEX IF NOT EXISTS prices_date_idx ON prices (trade_date DESC);
 
 -- Reported financials (from company filings). Q = quarter, FY = financial year.
