@@ -105,6 +105,7 @@ jobs:
       - name: Fundamentals from results filings
         if: env.FUNDAMENTALS != 'none'
         continue-on-error: true # NSE may refuse cloud IPs; prices are still loaded
+        timeout-minutes: 210 # leave time for metrics + copy within the job limit
         working-directory: backend
         run: python -u -m app.ingest.results --universe "$FUNDAMENTALS"
 
