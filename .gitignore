@@ -1,0 +1,34 @@
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+npm-debug.log*
+
+# Data dumps (keep templates)
+data/*
+!data/fundamentals_template.csv
+*.zip
+
+# OS / editors
+.DS_Store
+.idea/
+.vscode/
+next-env.d.ts
+
+# Generated against an internal npm mirror on this machine; regenerate with public registry
+web/package-lock.json
