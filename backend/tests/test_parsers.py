@@ -45,3 +45,8 @@ def test_parse_index_constituents():
     assert parse_index_constituents(text) == [
         {"symbol": "360ONE", "sector": "Financial Services", "name": "360 ONE WAM Ltd."}
     ]
+
+
+def test_parse_legacy_two_digit_year():
+    text = LEGACY.replace("05-JUL-2024", "13-Jul-20")
+    assert parse_bhavcopy(text)[0]["trade_date"] == date(2020, 7, 13)

@@ -22,7 +22,7 @@ def _int(v: str | None) -> int | None:
 
 def _parse_date(v: str) -> date:
     v = v.strip()
-    for fmt in ("%Y-%m-%d", "%d-%b-%Y", "%d-%m-%Y"):
+    for fmt in ("%Y-%m-%d", "%d-%b-%Y", "%d-%m-%Y", "%d-%b-%y"):
         try:
             return datetime.strptime(v, fmt).date()
         except ValueError:
