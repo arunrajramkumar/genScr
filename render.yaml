@@ -1,0 +1,66 @@
+# Render Blueprint: Dashboard → New → Blueprint → pick this repo.
+# Render will prompt for values marked `sync: false`.
+databases:
+  - name: genscr-db
+    databaseName: genscr
+    user: genscr
+    region: singapore
+    plan: basic-256mb
+
+services:
+  - type: web
+    name: genscr-api
+    runtime: docker
+    region: singapore
+    plan: starter
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    healthCheckPath: /api/health
+    buildFilter:
+      paths: ["backend/**"]
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: genscr-db, property: connectionString }
+      - key: CORS_ORIGINS # e.g. https://dalallens.in,https://www.dalallens.in
+        sync: false
+
+  - type: web
+    name: genscr-web
+    runtime: docker
+    region: singapore
+    plan: starter
+    dockerfilePath: ./web/Dockerfile
+    dockerContext: ./web
+    buildFilter:
+      paths: ["web/**"]
+    envVars:
+      - key: NEXT_PUBLIC_API_URL # e.g. https://api.dalallens.in (baked in at build time; redeploy after changing)
+        sync: false
+
+  # 14:00 UTC = 19:30 IST, Mon-Fri: load the day's bhavcopy and rebuild metrics.
+  - type: cron
+    name: genscr-daily
+    runtime: docker
+    region: singapore
+    plan: starter
+    schedule: "0 14 * * 1-5"
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: sh -c "python -m app.ingest.bhavcopy && python -m app.ingest.compute_metrics"
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: genscr-db, property: connectionString }
+
+  # Sundays 03:30 UTC: refresh the stock list and sectors.
+  - type: cron
+    name: genscr-weekly
+    runtime: docker
+    region: singapore
+    plan: starter
+    schedule: "30 3 * * 0"
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    dockerCommand: python -m app.ingest.equity_list
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase: { name: genscr-db, property: connectionString }
