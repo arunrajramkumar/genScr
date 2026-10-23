@@ -1,0 +1,76 @@
+name: Seed hosted database
+
+# Manual, one-off: loads the CSV export (scripts/export_data.sh) attached to a GitHub Release
+# into the hosted Postgres. Runs on GitHub's runners, so it works even when your own network
+# blocks direct database connections.
+#
+# Setup:
+#   1. Repo → Settings → Secrets and variables → Actions → New repository secret
+#        RENDER_DATABASE_URL = Render "External Database URL"
+#   2. Repo → Releases → Draft a new release, tag e.g. data-latest, attach data/export/*.csv.gz
+#   3. Actions → Seed hosted database → Run workflow (type REPLACE to confirm)
+
+on:
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Release tag that holds the *.csv.gz export files
+        required: true
+        default: data-latest
+      confirm:
+        description: Type REPLACE to overwrite the hosted database tables
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: seed-database
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Check inputs and secret
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          TARGET_URL: ${{ secrets.RENDER_DATABASE_URL }}
+        run: |
+          if [ "$CONFIRM" != "REPLACE" ]; then
+            echo "::error::Type REPLACE in the 'confirm' input to run this workflow."; exit 1
+          fi
+          if [ -z "$TARGET_URL" ]; then
+            echo "::error::Add the RENDER_DATABASE_URL repository secret (Render External Database URL)."; exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Download export files from the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          mkdir -p data/export
+          gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --pattern '*.csv.gz' --dir data/export
+          ls -lh data/export
+          for t in stocks prices fundamentals stock_metrics; do
+            [ -f "data/export/$t.csv.gz" ] || { echo "::error::Release $RELEASE_TAG is missing $t.csv.gz"; exit 1; }
+          done
+
+      - name: Import into the hosted database
+        env:
+          DB_URL: ${{ secrets.RENDER_DATABASE_URL }}
+        run: |
+          # Render's external connections require SSL.
+          case "$DB_URL" in
+            *sslmode=*) TARGET_URL="$DB_URL" ;;
+            *\?*)       TARGET_URL="$DB_URL&sslmode=require" ;;
+            *)          TARGET_URL="$DB_URL?sslmode=require" ;;
+          esac
+          export TARGET_URL
+          scripts/import_data.sh
