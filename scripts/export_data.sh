@@ -2,6 +2,7 @@
 # Export all genScr tables to gzipped CSVs (portable: works for TimescaleDB or plain Postgres targets).
 #   scripts/export_data.sh            # from the docker compose db
 #   SOURCE_URL=postgresql://... scripts/export_data.sh   # from any Postgres (needs psql)
+#   SINCE=2021-01-01 scripts/export_data.sh            # only recent prices (smaller, e.g. for a free-tier db)
 set -euo pipefail
 
 OUT="${OUT:-data/export}"
@@ -17,6 +18,8 @@ run_psql() {
 }
 
 for t in "${TABLES[@]}"; do
-  run_psql -c "\copy (SELECT * FROM $t) TO STDOUT WITH (FORMAT csv, HEADER)" | gzip > "$OUT/$t.csv.gz"
+  where=""
+  [[ "$t" == "prices" && -n "${SINCE:-}" ]] && where="WHERE trade_date >= DATE '$SINCE'"
+  run_psql -c "\copy (SELECT * FROM $t $where) TO STDOUT WITH (FORMAT csv, HEADER)" | gzip > "$OUT/$t.csv.gz"
   echo "$t: $(gunzip -c "$OUT/$t.csv.gz" | tail -n +2 | wc -l | tr -d ' ') rows -> $OUT/$t.csv.gz"
 done

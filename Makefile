@@ -28,8 +28,8 @@ fundamentals:  ## make fundamentals FILE=data/my_fundamentals.csv
 	$(COMPOSE) run --rm -v $(PWD)/data:/app/data api python -m app.ingest.fundamentals_csv $(FILE)
 	$(RUN) app.ingest.compute_metrics
 
-export-data:   ## Dump all tables to data/export/*.csv.gz
-	scripts/export_data.sh
+export-data:   ## Dump all tables to data/export/*.csv.gz (SINCE=2021-01-01 for recent prices only)
+	SINCE='$(SINCE)' scripts/export_data.sh
 
 import-data:   ## make import-data TARGET_URL='postgresql://...'  (replaces table contents)
 	TARGET_URL='$(TARGET_URL)' scripts/import_data.sh
