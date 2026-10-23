@@ -10,7 +10,9 @@ A fast, transparent stock screener for NSE-listed companies: search, screen, ana
 |---|---|
 | **Search** | Typo-tolerant search by symbol or company name (Postgres trigram). Press `/` anywhere to search. |
 | **Market overview** | Breadth (advances/declines, 52W highs and lows), top gainers and losers, most active by turnover, sector heatmap |
-| **Stock page** | Corporate-action-adjusted candlestick chart with volume (1M–max), 52W range, valuation and return ratios, Piotroski F-score, Altman Z'', RSI and moving-average trend, sector peers, annual financials |
+| **Stock page** | Split/bonus-adjusted area or candle chart with 50/200 DMA and OHLC hover readout, signal chips, valuation and return ratios, Piotroski F-score, Altman Z'', RSI, sector peers, annual and quarterly financials |
+| **What-if calculator** | One-time or monthly SIP, any amount, 1–N years slider: value, gain, CAGR/XIRR, growth chart |
+| **5-year outlook** | Bear/base/bull CAGR *scenarios* from historical price CAGR, profit CAGR and volatility (clearly labelled: not a forecast) |
 | **Screener** | Plain query language (`roe > 18 and debt_to_equity < 0.5`), 6 presets, sortable results, sector filter |
 | **Compare** | 2–5 stocks side by side with the best value per metric highlighted, plus 1-year performance rebased to 100 |
 
@@ -56,21 +58,25 @@ cd ../web && npm install && npm run dev   # web on :3000
 | EOD prices | NSE bhavcopy (`nsearchives.nseindia.com/content/cm/…`) | Fetched **once per trading day**, cached in Postgres. Both the current UDiFF and pre-July-2024 formats are supported. |
 | Stock list | NSE `EQUITY_L.csv` | Weekly refresh |
 | Sectors | NSE Nifty 500 constituent file | Covers Nifty 500 names; others show no sector |
-| Fundamentals | Company filings (CSV loader now, XBRL parser on the roadmap) | Load only data you have the right to use. See `data/fundamentals_template.csv` |
+| Fundamentals | Companies' financial-results XBRL filings (`app.ingest.results`) | Legacy and SEBI Integrated Filing formats, consolidated preferred, banks supported. Filing indexes come from NSE's website API, so run quarterly at a low request rate. CSV loader is also available. |
 
 Ground rules: never scrape NSE pages per user request, keep request rates low, label prices as end-of-day, and don't publish buy/sell calls. Before commercial launch, confirm redistribution terms with NSE Data & Analytics.
 
 ## Fundamentals
 
-Ratios (P/E, ROE, ROCE, D/E, Piotroski, Altman Z'') need fundamentals. Fill a CSV in the template format (₹ crore), then:
+Ratios (P/E, ROE, ROCE, D/E, Piotroski, Altman Z'') come from company filings:
 
 ```bash
-make fundamentals FILE=data/my_fundamentals.csv
+python -m app.ingest.results --symbols TCS,INFY            # a few companies (~8 requests each)
+python -m app.ingest.results --universe nifty500 --skip-existing   # ~1-2 hours, resumable
+python -m app.ingest.compute_metrics
 ```
+
+Or load your own CSV in the `data/fundamentals_template.csv` format: `make fundamentals FILE=data/my.csv`.
 
 ## Roadmap
 
-1. **XBRL financial results parser** (BSE/NSE filings) to fill fundamentals automatically
+1. TTM (trailing-twelve-month) ratios from quarterly results; dividends in total-return calculations
 2. Shareholding patterns, promoter pledges, insider trades (SAST/PIT), bulk and block deals
 3. Corporate announcements feed, plus AI summaries of results and concalls with source citations
 4. Natural-language screener ("debt-free IT companies growing 20%") that translates to the query language

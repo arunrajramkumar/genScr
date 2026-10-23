@@ -8,17 +8,41 @@
 
 body {
   @apply bg-bg text-slate-200 antialiased;
-  background-image: radial-gradient(1200px 600px at 10% -10%, rgba(124, 156, 255, 0.08), transparent),
-    radial-gradient(900px 500px at 110% 10%, rgba(34, 197, 94, 0.05), transparent);
+  background-image:
+    radial-gradient(1000px 520px at 15% -12%, rgba(124, 156, 255, 0.10), transparent 60%),
+    radial-gradient(800px 480px at 105% 0%, rgba(0, 212, 126, 0.07), transparent 60%),
+    radial-gradient(700px 420px at 50% 120%, rgba(255, 77, 94, 0.05), transparent 60%);
   background-attachment: fixed;
+}
+
+/* faint grid behind hero sections */
+.grid-bg {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.025) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+
+input[type="range"].slider {
+  @apply h-1.5 w-full cursor-pointer appearance-none rounded-full bg-line;
+}
+input[type="range"].slider::-webkit-slider-thumb {
+  @apply h-5 w-5 appearance-none rounded-full border-2 border-white bg-accent shadow-glow-accent;
+}
+input[type="range"].slider::-moz-range-thumb {
+  @apply h-5 w-5 rounded-full border-2 border-white bg-accent;
 }
 
 @layer components {
   .panel {
-    @apply rounded-2xl border border-line bg-panel/80 backdrop-blur;
+    @apply rounded-2xl border border-white/[0.06] bg-gradient-to-b from-white/[0.035] to-white/[0.01] backdrop-blur;
+  }
+  .panel-hover {
+    @apply transition duration-200 hover:-translate-y-0.5 hover:border-white/[0.12];
   }
   .label {
-    @apply text-xs font-medium uppercase tracking-wider text-muted;
+    @apply text-[11px] font-medium uppercase tracking-[0.12em] text-muted;
   }
   .num {
     @apply font-mono tabular-nums;
@@ -27,10 +51,19 @@ body {
     @apply inline-flex items-center gap-2 rounded-lg border border-line bg-panel px-3 py-1.5 text-sm text-slate-200 transition hover:border-accent/60 hover:text-white disabled:opacity-50;
   }
   .btn-primary {
-    @apply inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg transition hover:brightness-110 disabled:opacity-50;
+    @apply inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-bg shadow-glow-accent transition hover:brightness-110 disabled:opacity-50;
   }
   .chip {
     @apply rounded-full border border-line px-3 py-1 text-xs text-slate-300 transition hover:border-accent/60 hover:text-white;
+  }
+  .seg {
+    @apply inline-flex rounded-lg border border-line bg-black/30 p-0.5;
+  }
+  .seg-btn {
+    @apply rounded-md px-2.5 py-1 text-xs text-muted transition hover:text-white;
+  }
+  .seg-btn-active {
+    @apply bg-white/10 text-white;
   }
   .table-row {
     @apply border-b border-line/60 transition hover:bg-white/[0.03];

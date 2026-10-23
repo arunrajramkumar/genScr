@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { ArrowDownRight, ArrowUpRight, Flame, SlidersHorizontal } from "lucide-react";
 import SearchBox from "@/components/SearchBox";
+import TickerTape from "@/components/TickerTape";
 import { ErrorNote, Loading, heatClass } from "@/components/ui";
 import { api } from "@/lib/api";
 import { changeClass, fmtCr, fmtPct, fmtPrice } from "@/lib/format";
@@ -12,7 +13,7 @@ import type { Overview, Stock } from "@/lib/types";
 
 function MoverList({ title, icon, rows, metric }: { title: string; icon: React.ReactNode; rows: Stock[]; metric: "change" | "turnover" }) {
   return (
-    <div className="panel p-4">
+    <div className="panel panel-hover p-4">
       <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white">
         {icon} {title}
       </div>
@@ -52,7 +53,8 @@ export default function Home() {
 
   return (
     <div className="space-y-10">
-      <section className="mx-auto max-w-3xl pt-6 text-center">
+      <section className="relative mx-auto max-w-3xl animate-fade-up pt-6 text-center">
+        <div className="grid-bg pointer-events-none absolute -inset-x-40 -inset-y-10" />
         <h1 className="bg-gradient-to-r from-white via-slate-200 to-accent bg-clip-text text-4xl font-bold tracking-tight text-transparent sm:text-5xl">
           Every NSE stock, clearly analysed.
         </h1>
@@ -69,6 +71,12 @@ export default function Home() {
           <Link href="/compare?symbols=TCS,INFY,HCLTECH" className="chip">Compare TCS · INFY · HCLTECH</Link>
         </div>
       </section>
+
+      {data && (
+        <div className="-mx-4">
+          <TickerTape stocks={[...data.active, ...data.gainers, ...data.losers]} />
+        </div>
+      )}
 
       {error && (
         <ErrorNote
