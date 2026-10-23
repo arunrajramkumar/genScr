@@ -16,7 +16,7 @@ for t in "${TABLES[@]}"; do
   cols=$(gunzip -c "$f" 2>/dev/null | head -1 || true)
   psql "$TARGET_URL" -v ON_ERROR_STOP=1 -q -c "TRUNCATE $t"
   gunzip -c "$f" | psql "$TARGET_URL" -v ON_ERROR_STOP=1 -q -c "\copy $t ($cols) FROM STDIN WITH (FORMAT csv, HEADER)"
+  psql "$TARGET_URL" -q -c "ANALYZE $t"  # just our tables; system catalogs need superuser
   echo "$t: $(psql "$TARGET_URL" -At -c "SELECT count(*) FROM $t") rows"
 done
-psql "$TARGET_URL" -q -c "ANALYZE"
 echo "Done."
