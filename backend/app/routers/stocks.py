@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.db import get_conn
 from app.services.adjust import adjust
+from app.services.facts import build_facts
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
@@ -92,3 +93,35 @@ def get_peers(symbol: str, limit: int = Query(8, ge=1, le=20), conn=Depends(get_
         """,
         (symbol, symbol, limit),
     ).fetchall()
+
+
+@router.get("/{symbol}/facts")
+def get_facts(symbol: str, conn=Depends(get_conn)):
+    symbol = normalize_symbol(symbol)
+    stock = conn.execute(
+        "SELECT m.*, s.* FROM stocks s LEFT JOIN stock_metrics m USING (symbol) WHERE s.symbol = %s", (symbol,)
+    ).fetchone()
+    if not stock:
+        raise HTTPException(404, f"{symbol} not found")
+    prices = conn.execute(
+        "SELECT trade_date, open, high, low, close, prev_close, volume FROM prices WHERE symbol = %s ORDER BY trade_date",
+        (symbol,),
+    ).fetchall()
+    fy = conn.execute(
+        "SELECT * FROM fundamentals WHERE symbol = %s AND period_type = 'FY' ORDER BY period_end DESC LIMIT 4", (symbol,)
+    ).fetchall()
+    rank = conn.execute(
+        """
+        SELECT rank, total, sector_rank, sector_total FROM (
+            SELECT m.symbol,
+                   rank() OVER (ORDER BY m.market_cap DESC) AS rank,
+                   count(*) OVER () AS total,
+                   rank() OVER (PARTITION BY s.sector ORDER BY m.market_cap DESC) AS sector_rank,
+                   count(*) OVER (PARTITION BY s.sector) AS sector_total
+            FROM stock_metrics m JOIN stocks s USING (symbol)
+            WHERE m.market_cap IS NOT NULL
+        ) t WHERE symbol = %s
+        """,
+        (symbol,),
+    ).fetchone()
+    return build_facts(stock, prices, fy, rank)

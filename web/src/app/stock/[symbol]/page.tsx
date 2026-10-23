@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { ArrowDownRight, ArrowUpRight, GitCompare } from "lucide-react";
 import AnimatedNumber from "@/components/AnimatedNumber";
+import DidYouKnow from "@/components/DidYouKnow";
 import Outlook from "@/components/Outlook";
 import { StockChart } from "@/components/PriceChart";
 import ReturnsCalculator from "@/components/ReturnsCalculator";
@@ -92,15 +93,18 @@ export default function StockPage() {
         </div>
       </section>
 
-      {/* Chart */}
-      <section className="panel p-4">
-        <div className="mb-1 flex justify-end">
-          <Link href={`/compare?symbols=${encodeURIComponent(stock.symbol)}${peers[0] ? "," + encodeURIComponent(peers[0].symbol) : ""}`} className="btn text-xs">
-            <GitCompare className="h-3.5 w-3.5" /> Compare with peers
-          </Link>
-        </div>
-        {prices === null ? <Loading /> : prices.length ? <StockChart data={prices} /> : <div className="py-16 text-center text-sm text-muted">No price history</div>}
-      </section>
+      {/* Chart + Did you know */}
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+        <section className="panel min-w-0 p-4">
+          <div className="mb-1 flex justify-end">
+            <Link href={`/compare?symbols=${encodeURIComponent(stock.symbol)}${peers[0] ? "," + encodeURIComponent(peers[0].symbol) : ""}`} className="btn text-xs">
+              <GitCompare className="h-3.5 w-3.5" /> Compare with peers
+            </Link>
+          </div>
+          {prices === null ? <Loading /> : prices.length ? <StockChart data={prices} /> : <div className="py-16 text-center text-sm text-muted">No price history</div>}
+        </section>
+        <DidYouKnow symbol={stock.symbol} />
+      </div>
 
       {/* Key stats */}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4 lg:grid-cols-6">

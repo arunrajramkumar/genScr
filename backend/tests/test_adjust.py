@@ -20,3 +20,18 @@ def test_bonus_is_back_adjusted():
 def test_no_corporate_action_is_noop():
     rows = [{"close": 100.0, "prev_close": 99.0}, {"close": 101.0, "prev_close": 100.0}]
     assert adjust(rows) == rows
+
+
+def test_legacy_bonus_detected_from_gap():
+    # Pre-2024 bhavcopy: prev_close NOT adjusted on the 1:1 bonus ex-date
+    rows = [
+        {"open": 3500.0, "close": 3520.0, "prev_close": 3480.0},
+        {"open": 1765.0, "close": 1770.0, "prev_close": 3520.0},
+    ]
+    out = adjust(rows)
+    assert out[0]["close"] == pytest.approx(1760.0)
+
+
+def test_genuine_crash_not_treated_as_split():
+    rows = [{"open": 100.0, "close": 100.0, "prev_close": 100.0}, {"open": 72.0, "close": 70.0, "prev_close": 100.0}]
+    assert adjust(rows)[0]["close"] == 100.0

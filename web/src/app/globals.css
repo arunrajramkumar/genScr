@@ -69,3 +69,8 @@ input[type="range"].slider::-moz-range-thumb {
     @apply border-b border-line/60 transition hover:bg-white/[0.03];
   }
 }
+
+@keyframes grow {
+  from { width: 0; }
+  to { width: 100%; }
+}
