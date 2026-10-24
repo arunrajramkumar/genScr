@@ -50,7 +50,7 @@ def _calendar(conn, **kw):
 
 
 def test_calendar_route_is_registered():
-    assert "/api/calendar" in client.get("/openapi.json").json()["paths"]
+    assert "/api/calendar" in app.openapi()["paths"]
 
 
 def test_parse_kinds():
@@ -115,7 +115,7 @@ def _events(conn, **kw):
 
 
 def test_events_route_is_registered():
-    assert "/api/calendar/events" in client.get("/openapi.json").json()["paths"]
+    assert "/api/calendar/events" in app.openapi()["paths"]
 
 
 def test_parse_categories():

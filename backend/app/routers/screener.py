@@ -11,14 +11,14 @@ router = APIRouter(prefix="/screener", tags=["screener"])
 
 
 class Filter(BaseModel):
-    field: str
-    op: str
-    value: float
+    field: str = Field(max_length=40)
+    op: str = Field(max_length=2)
+    value: float = Field(allow_inf_nan=False)
 
 
 class ScreenRequest(BaseModel):
     query: str | None = Field(None, max_length=1000)
-    filters: list[Filter] = []
+    filters: list[Filter] = Field([], max_length=20)
     sector: str | None = None
     sort: str = "market_cap"
     order: Literal["asc", "desc"] = "desc"

@@ -30,7 +30,8 @@ async def lifespan(_: FastAPI):
     pool.close()
 
 
-app = FastAPI(title="genScr API", version="0.1.0", lifespan=lifespan)
+docs = {} if settings.enable_docs else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+app = FastAPI(title="genScr API", version="0.1.0", lifespan=lifespan, **docs)
 
 limiter = RateLimiter(settings.rate_limit_per_minute)
 app.middleware("http")(make_guard_middleware(limiter))
@@ -39,7 +40,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
     allow_methods=["GET", "POST"],
-    allow_headers=["*"],
+    allow_headers=["Content-Type"],
     max_age=86400,  # browsers cache the preflight for a day
 )
 

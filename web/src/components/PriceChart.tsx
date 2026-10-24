@@ -163,7 +163,9 @@ export function StockChart({ data }: { data: Candle[] }) {
   );
 }
 
-export function CompareChart({ series }: { series: Record<string, { time: string; value: number }[]> }) {
+export function CompareChart({ series, benchmark }: {
+  series: Record<string, { time: string; value: number }[]>; benchmark?: { name: string; points: { time: string; value: number }[] };
+}) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -173,9 +175,13 @@ export function CompareChart({ series }: { series: Record<string, { time: string
       const line = chart.addLineSeries({ color: LINE_COLORS[i % LINE_COLORS.length], lineWidth: 2, title: symbol });
       line.setData(pts.map((p) => ({ time: p.time, value: p.value })));
     });
+    if (benchmark?.points.length) {
+      chart.addLineSeries({ color: "#7d8aa0", lineWidth: 1, lineStyle: 2, title: benchmark.name, priceLineVisible: false })
+        .setData(benchmark.points.map((p) => ({ time: p.time, value: p.value })));
+    }
     chart.timeScale().fitContent();
     return () => chart.remove();
-  }, [series]);
+  }, [series, benchmark]);
 
   return <div ref={ref} className="h-[320px] w-full" />;
 }

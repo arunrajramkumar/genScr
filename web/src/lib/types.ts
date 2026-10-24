@@ -93,10 +93,29 @@ export interface Overview {
   sectors: { sector: string; stocks: number; avg_change: Num; avg_return_1y: Num }[];
 }
 
+export interface DayMove { date: string; pct: number }
+export interface CompareRisk {
+  since: string;
+  full_window: boolean;
+  total_return: number;
+  cagr: number | null;
+  volatility: number | null;
+  drawdown: { pct: number; peak: string; trough: string; recovered: string | null; current_pct: number } | null;
+  beta: number | null;
+  best_day: DayMove | null;
+  worst_day: DayMove | null;
+  up_days_pct: number | null;
+}
 export interface CompareResponse {
   stocks: Stock[];
   fields: Record<string, FieldMeta>;
+  years: number;
   performance: Record<string, { time: string; value: number }[]>;
+  benchmark: { name: string; performance: { time: string; value: number }[] };
+  risk: Record<string, CompareRisk | null>;
+  correlations: { a: string; b: string; value: number | null }[];
+  quarters: Record<string, { period_end: string; revenue: number | null; net_profit: number | null }[]>;
+  events: Record<string, { date: string; purpose: string }[]>;
 }
 
 export interface ReturnSummary {

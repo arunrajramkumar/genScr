@@ -16,6 +16,8 @@ class Settings(BaseSettings):
 
     # Public API: per-IP requests per minute. Limits bulk scraping/redistribution of exchange data.
     rate_limit_per_minute: int = Field(90, ge=10)
+    # Interactive API docs (/docs, /openapi.json) stay off in production so the API surface isn't advertised.
+    enable_docs: bool = False
 
 
 settings = Settings()

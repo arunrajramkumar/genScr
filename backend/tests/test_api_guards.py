@@ -60,3 +60,33 @@ def test_nse_request_delay_has_a_floor():
 def test_rate_limit_cannot_be_disabled():
     with pytest.raises(ValidationError):
         Settings(rate_limit_per_minute=0)
+
+
+def test_docs_and_schema_are_hidden_by_default():
+    for path in ("/docs", "/redoc", "/openapi.json"):
+        assert client.get(path).status_code == 404
+
+
+def test_client_ip_prefers_cloudflare_header_over_spoofable_forwarded_for():
+    from starlette.requests import Request
+
+    from app.middleware import client_ip
+
+    def req(headers):
+        return Request({"type": "http", "headers": [(k.encode(), v.encode()) for k, v in headers.items()], "client": ("10.0.0.1", 1)})
+
+    assert client_ip(req({"cf-connecting-ip": "203.0.113.9", "x-forwarded-for": "1.2.3.4, 203.0.113.9"})) == "203.0.113.9"
+    assert client_ip(req({"x-forwarded-for": "1.2.3.4"})) == "1.2.3.4"
+    assert client_ip(req({})) == "10.0.0.1"
+
+
+def test_screener_rejects_oversized_or_invalid_filters():
+    from app.routers.screener import ScreenRequest
+
+    with pytest.raises(ValidationError):
+        ScreenRequest(filters=[{"field": "pe", "op": "<", "value": 10}] * 21)
+    with pytest.raises(ValidationError):
+        ScreenRequest(filters=[{"field": "pe", "op": "<", "value": "nan"}])
+    with pytest.raises(ValidationError):
+        ScreenRequest(filters=[{"field": "x" * 41, "op": "<", "value": 1}])
+    assert len(ScreenRequest(filters=[{"field": "pe", "op": "<", "value": 10}] * 20).filters) == 20

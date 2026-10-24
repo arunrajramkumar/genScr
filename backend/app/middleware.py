@@ -10,7 +10,9 @@ SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    "X-Robots-Tag": "noindex, nofollow",  # the API is data plumbing, not content for search engines
+    "X-Robots-Tag": "noindex, nofollow",
+    "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'",  # JSON only: nothing may load or frame it
+    "Cross-Origin-Resource-Policy": "cross-origin",  # the API is data plumbing, not content for search engines
 }
 
 
@@ -37,6 +39,11 @@ class RateLimiter:
 
 
 def client_ip(request: Request) -> str:
+    # Render sits behind Cloudflare, which overwrites CF-Connecting-IP with the real client address. The left-most
+    # X-Forwarded-For entry is whatever the client sent, so it is only a fallback (e.g. local proxies).
+    cf = request.headers.get("cf-connecting-ip")
+    if cf:
+        return cf.strip()
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
         return forwarded.split(",")[0].strip()
