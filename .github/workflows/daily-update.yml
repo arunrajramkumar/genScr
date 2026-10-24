@@ -15,7 +15,7 @@ on:
       task:
         description: What to update
         type: choice
-        options: [prices, stocks, fundamentals, all]
+        options: [prices, stocks, fundamentals, corporate-actions-history, all]
         default: prices
 
 permissions:
@@ -84,6 +84,11 @@ jobs:
         continue-on-error: true # NSE may refuse cloud IPs; prices and metrics still update
         working-directory: backend
         run: python -u -m app.ingest.corporate_actions
+
+      - name: Corporate actions history since 2005 (one-off, ~10 min)
+        if: env.TASK == 'corporate-actions-history'
+        working-directory: backend
+        run: python -u -m app.ingest.corporate_actions --from 2005-01-01
 
       - name: Latest results filings (Nifty 500)
         if: env.TASK == 'fundamentals' || env.TASK == 'all'
