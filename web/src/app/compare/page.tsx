@@ -183,7 +183,7 @@ function Compare() {
                         <td key={s.symbol} className={clsx("num px-4 py-2 text-right", i === winner && "font-semibold text-up")}>
                           <span className="inline-flex items-center gap-1">
                             {i === winner && <span className="h-1.5 w-1.5 rounded-full bg-up" aria-hidden />}
-                            {fmtField(s[field as keyof typeof s] as string | number | null, meta?.unit ?? "")}
+                            {fmtField(s[field as keyof typeof s] as string | number | null, meta?.unit ?? "", field)}
                           </span>
                         </td>
                       ))}

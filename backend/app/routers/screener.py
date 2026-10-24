@@ -33,14 +33,19 @@ def run_screen(req: ScreenRequest, conn=Depends(get_conn)):
         if req.query:
             filters += screener.parse_query(req.query)
         sql, params = screener.build_sql(filters, req.sector, req.sort, req.order, req.limit)
+        isql, iparams = screener.insights_sql(filters, req.sector)
+        msql, ssql, mparams = screener.matches_sql(filters, req.sector)
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     rows = conn.execute(sql, params).fetchall()
-    total = rows[0]["total_matches"] if rows else 0
     for r in rows:
         r.pop("total_matches", None)
-    universe = conn.execute("SELECT count(*) AS n FROM stock_metrics").fetchone()["n"]
-    return {"filters": filters, "count": len(rows), "total": total, "universe": universe, "results": rows}
+    info = screener.insights(conn.execute(isql, iparams).fetchone(), filters, req.sector)
+    total = info["funnel"][-1]["remaining"] if info["funnel"] else info["universe"]
+    medians = {k: round(v, 2) for k, v in conn.execute(msql, mparams).fetchone().items() if v is not None}
+    sectors = [[r["sector"], r["n"]] for r in conn.execute(ssql, mparams)]
+    return {"filters": filters, "count": len(rows), "total": total, "universe": info["universe"],
+            "funnel": info["funnel"], "sizes": info["sizes"], "medians": medians, "sectors": sectors, "results": rows}
 
 
 @router.get("/stats")

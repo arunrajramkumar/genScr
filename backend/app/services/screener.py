@@ -174,6 +174,72 @@ def build_sql(
     return sql, params
 
 
+def _conditions(filters: list[dict], sector: str | None) -> list[tuple[str, str, list]]:
+    """[(label key, SQL condition, params)] in the order the user added them, sector last."""
+    out = []
+    for f in filters:
+        field = resolve_field(f["field"])
+        if f["op"] not in OPS:
+            raise ValueError(f"Unsupported operator '{f['op']}'")
+        out.append((field, f"m.{field} {f['op']} %s", [float(f["value"])]))
+    if sector:
+        out.append(("sector", "s.sector = %s", [sector]))
+    return out
+
+
+def insights_sql(filters: list[dict], sector: str | None = None) -> tuple[str, list]:
+    """One pass over the snapshot: how many stocks remain after each filter (a funnel), and the size mix of the matches.
+
+    Size follows SEBI's mutual-fund categorisation by market-cap rank: top 100 large, 101-250 mid, the rest small.
+    """
+    conds = _conditions(filters, sector)
+    cols, params = ["count(*) AS step_0"], []
+    for i in range(1, len(conds) + 1):
+        cols.append(f"count(*) FILTER (WHERE {' AND '.join(c for _, c, _ in conds[:i])}) AS step_{i}")
+        for _, _, p in conds[:i]:
+            params += p
+    every = " AND ".join(["TRUE", *(c for _, c, _ in conds)])
+    every_params = [v for _, _, p in conds for v in p]
+    params += every_params * 4  # once per size bucket below
+    sizes = {
+        "large": "m.market_cap >= cut.large",
+        "mid": "m.market_cap >= cut.mid AND m.market_cap < cut.large",
+        "small": "m.market_cap < cut.mid",
+        "unknown": "m.market_cap IS NULL",
+    }
+    cols += [f"count(*) FILTER (WHERE {every} AND {cond}) AS size_{k}" for k, cond in sizes.items()]
+    sql = (
+        "WITH ranked AS (SELECT market_cap, row_number() OVER (ORDER BY market_cap DESC) AS r "
+        "                FROM stock_metrics WHERE market_cap IS NOT NULL), "
+        "cut AS (SELECT coalesce((SELECT market_cap FROM ranked WHERE r = 100), 0) AS large, "
+        "               coalesce((SELECT market_cap FROM ranked WHERE r = 250), 0) AS mid) "
+        f"SELECT {', '.join(cols)} FROM stock_metrics m JOIN stocks s USING (symbol) CROSS JOIN cut"
+    )
+    return sql, params
+
+
+def matches_sql(filters: list[dict], sector: str | None = None) -> tuple[str, str, list]:
+    """(medians SQL, sector-count SQL, params) over every match, not just the rows returned."""
+    conds = _conditions(filters, sector)
+    where = " AND ".join(["TRUE", *(c for _, c, _ in conds)])
+    params = [v for _, _, p in conds for v in p]
+    medians = ", ".join(f"percentile_cont(0.5) WITHIN GROUP (ORDER BY m.{c}) AS {c}" for c in FIELDS)
+    base = f"FROM stock_metrics m JOIN stocks s USING (symbol) WHERE {where}"
+    return (f"SELECT {medians} {base}",
+            f"SELECT s.sector, count(*) AS n {base} AND s.sector IS NOT NULL GROUP BY s.sector ORDER BY n DESC, s.sector",
+            params)
+
+
+def insights(row: dict, filters: list[dict], sector: str | None = None) -> dict:
+    conds = _conditions(filters, sector)
+    funnel = [{"key": key, "remaining": row[f"step_{i}"]} for i, (key, _, _) in enumerate(conds, 1)]
+    return {
+        "universe": row["step_0"],
+        "funnel": funnel,
+        "sizes": {k: row[f"size_{k}"] for k in ("large", "mid", "small", "unknown")},
+    }
+
+
 def distribution(values: list[float], bins: int = 24) -> dict:
     """Percentiles and a histogram clipped to the 2nd-98th percentile (so outliers don't flatten it)."""
     v = sorted(float(x) for x in values)

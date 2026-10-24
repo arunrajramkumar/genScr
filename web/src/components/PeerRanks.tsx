@@ -70,7 +70,7 @@ export default function PeerRanks({ symbol }: { symbol: string }) {
               <div key={m.field}>
                 <div className="flex items-baseline justify-between gap-2 text-sm">
                   <span className="text-slate-300">{m.label}</span>
-                  <span className="num text-white">{fmtField(m.value, UNITS[m.field] ?? "")}</span>
+                  <span className="num text-white">{fmtField(m.value, UNITS[m.field] ?? "", m.field)}</span>
                 </div>
                 <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/5">
                   <div className={clsx("h-full rounded-full transition-all duration-700", t.bar)} style={{ width: `${Math.max(3, p)}%` }} />

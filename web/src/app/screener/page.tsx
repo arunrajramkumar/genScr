@@ -5,11 +5,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { ArrowDown, ArrowUp, Check, ChevronDown, Code2, GitCompare, Link2, Plus, ScatterChart, Search, Table2, X } from "lucide-react";
+import { Activity, ArrowDown, ArrowDownToLine, ArrowUp, Award, CalendarCheck, Check, ChevronDown, Code2, Coins, GitCompare, LineChart, Link2, Plus, Scale, ScatterChart, Search, ShieldCheck, Table2, TrendingUp, X, type LucideIcon } from "lucide-react";
 import { SectionNote } from "@/components/Legal";
 import { ErrorNote, Loading } from "@/components/ui";
 import { api } from "@/lib/api";
-import { changeClass, fmtField, toNum } from "@/lib/format";
+import { changeClass, fmtField, SIGNED_FIELDS } from "@/lib/format";
+import { type Dist, Funnel, Glance, MarketPosition, percentileOf, type Sizes } from "@/components/ScreenerInsights";
 import type { Preset, Stock } from "@/lib/types";
 
 const ScreenerScatter = dynamic(() => import("@/components/ScreenerScatter"), { ssr: false, loading: () => <Loading /> });
@@ -17,15 +18,21 @@ const ScreenerScatter = dynamic(() => import("@/components/ScreenerScatter"), { 
 type Op = ">" | ">=" | "<" | "<=";
 interface Filter { id: number; field: string; op: Op; value: string }
 interface FieldInfo { label: string; unit: string; higher_is_better: boolean | null; description: string; group: string }
-interface Dist { count: number; p10?: number; p25?: number; p50?: number; p75?: number; p90?: number; hist_lo?: number; hist_hi?: number; hist?: number[] }
 interface Stats { fields: Record<string, Dist>; sectors: string[]; universe: number }
-interface Result { count: number; total: number; universe: number; results: Stock[] }
+interface Result {
+  count: number; total: number; universe: number; results: Stock[];
+  filters: { field: string; op: Op; value: number }[]; funnel: { key: string; remaining: number }[];
+  sizes: Sizes; medians: Record<string, number>; sectors: [string, number][];
+}
 
 const CORE = ["close", "change_pct", "market_cap", "pe", "roe", "return_1y", "dividend_yield"];
 const OPS: Op[] = [">", ">=", "<", "<="];
 const OP_WORDS: Record<Op, string> = { ">": "above", ">=": "at least", "<": "below", "<=": "at most" };
 const COND = /^\s*([a-z_0-9/]+)\s*(>=|<=|>|<)\s*(-?\d+(?:\.\d+)?)\s*$/i;
-const SIGNED = ["change_pct", "return_1y", "return_1m", "cagr_3y", "cagr_5y"];
+const PRESET_ICONS: Record<string, LucideIcon> = {
+  quality: Award, value: Scale, growth: TrendingUp, momentum: Activity, safe: ShieldCheck, dividend: Coins,
+  streak: CalendarCheck, steady: LineChart, oversold: ArrowDownToLine,
+};
 
 let nextId = 1;
 const toQuery = (fs: Filter[]) =>
@@ -40,13 +47,6 @@ function fromQuery(q: string, known: Record<string, FieldInfo>): Filter[] | null
     out.push({ id: nextId++, field: m[1].toLowerCase(), op: m[2] as Op, value: m[3] });
   }
   return out;
-}
-
-function median(values: (number | null)[]): number | null {
-  const v = values.filter((x): x is number => x !== null).sort((a, b) => a - b);
-  if (!v.length) return null;
-  const m = Math.floor(v.length / 2);
-  return v.length % 2 ? v[m] : (v[m - 1] + v[m]) / 2;
 }
 
 /** Share of the market passing a threshold, estimated from the histogram. */
@@ -226,20 +226,35 @@ function Screener() {
 
   const filtered = Array.from(new Set(filters.map((f) => f.field)));
   const columns = Array.from(new Set([...filtered, ...CORE])).filter((c) => fields[c]).slice(0, 10);
+  const describe = (f: { field: string; op: Op; value: number }) =>
+    `${fields[f.field]?.label ?? f.field} ${OP_WORDS[f.op]} ${fmtField(f.value, fields[f.field]?.unit ?? "")}`;
   const english = filters
     .filter((f) => f.value !== "" && !isNaN(Number(f.value)) && fields[f.field])
-    .map((f) => `${fields[f.field].label} ${OP_WORDS[f.op]} ${fmtField(Number(f.value), fields[f.field].unit).replace(/^\+/, "")}`);
+    .map((f) => describe({ field: f.field, op: f.op, value: Number(f.value) }));
 
-  const summary = useMemo(() => {
-    const rows = data?.results ?? [];
-    const med = (k: string) => median(rows.map((r) => toNum(r[k as keyof Stock] as never)));
-    const sectors = new Map<string, number>();
-    rows.forEach((r) => r.sector && sectors.set(r.sector, (sectors.get(r.sector) ?? 0) + 1));
-    return {
-      items: ["roe", "pe", "return_1y", "dividend_yield"].map((k) => ({ k, v: med(k), mkt: stats?.fields[k]?.p50 ?? null })),
-      sectors: Array.from(sectors.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6),
-    };
-  }, [data, stats]);
+  const glance = useMemo(() => {
+    if (!data) return null;
+    const keys = Array.from(new Set([...(data.filters ?? []).map((f) => f.field), "roe", "pe", "return_1y", "dividend_yield"]));
+    const known = keys.filter((k) => fields[k]);
+    return known.slice(0, Math.min(6, known.length - (known.length % 2))).map((k) => ({
+      key: k, label: fields[k].label, unit: fields[k].unit, value: data.medians?.[k] ?? null, market: stats?.fields[k]?.p50 ?? null,
+    }));
+  }, [data, fields, stats]);
+
+  const funnel = (data?.funnel ?? []).map((step, i) => ({
+    label: step.key === "sector" ? `Sector: ${sector}` : data?.filters[i] ? describe(data.filters[i]) : step.key,
+    remaining: step.remaining,
+  }));
+  const strictest = (() => {
+    let prev = data?.universe ?? 0, worst = -1, ratio = 2;
+    funnel.forEach((st, i) => {
+      const r = prev ? st.remaining / prev : 1;
+      if (r < ratio) { ratio = r; worst = i; }
+      prev = st.remaining;
+    });
+    return worst;
+  })();
+  const asOf = data?.results[0]?.as_of;
 
   const scatterAxes = axes ?? { x: filtered[1] ?? "pe", y: filtered[0] ?? "roe" };
   const share = () => navigator.clipboard?.writeText(window.location.href).then(() => {
@@ -257,10 +272,22 @@ function Screener() {
         <button onClick={switchMode} className="btn text-xs"><Code2 className="h-3.5 w-3.5" /> {mode === "builder" ? "Type a query" : "Use the builder"}</button>
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        {presets.map((p) => (
-          <button key={p.id} title={p.description} className="chip" onClick={() => applyPreset(p)}>{p.name}</button>
-        ))}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+        {presets.map((p) => {
+          const Icon = PRESET_ICONS[p.id] ?? Search;
+          const active = query.replace(/\s+/g, " ").trim() === p.query.replace(/\s+/g, " ").trim();
+          return (
+            <button key={p.id} onClick={() => applyPreset(p)} aria-pressed={active}
+              className={clsx("group flex items-start gap-2.5 rounded-xl border p-3 text-left transition",
+                active ? "border-accent/60 bg-accent/10" : "border-white/[0.07] bg-white/[0.02] hover:border-accent/40 hover:bg-white/[0.04]")}>
+              <span className={clsx("mt-0.5 rounded-lg p-1.5", active ? "bg-accent/20 text-accent" : "bg-white/5 text-muted group-hover:text-accent")}><Icon className="h-3.5 w-3.5" /></span>
+              <span className="min-w-0">
+                <span className="block text-xs font-medium leading-snug text-white">{p.name}</span>
+                <span className="mt-0.5 line-clamp-2 block text-[11px] leading-snug text-muted">{p.description}</span>
+              </span>
+            </button>
+          );
+        })}
       </div>
       <SectionNote>Presets are example filters on public data, not stock picks or recommendations. Results change daily.</SectionNote>
 
@@ -292,7 +319,7 @@ function Screener() {
                     </div>
                     <Histogram d={d} op={f.op} value={v} />
                     <div className="mt-1 flex flex-wrap items-center justify-between gap-1 text-[11px] text-muted">
-                      <span>{pass !== null ? <>≈<span className="num text-slate-200">{pass.toFixed(0)}%</span> of stocks pass</> : "No market data"}</span>
+                      <span>{pass !== null ? <>≈<span className="num text-slate-200">{pass.toFixed(0)}%</span> of the <span className="num">{d?.count.toLocaleString("en-IN")}</span> stocks with this figure pass</> : "No market data"}</span>
                       {d?.p25 !== undefined && d.p75 !== undefined && d.p10 !== undefined && d.p90 !== undefined && d.p50 !== undefined && hib !== null && hib !== undefined && (
                         <span className="flex gap-1">
                           {([["Top half", d.p50], ["Top 25%", hib ? d.p75 : d.p25], ["Top 10%", hib ? d.p90 : d.p10]] as [string, number][]).map(([label, val]) => (
@@ -325,6 +352,7 @@ function Screener() {
             <div className="mt-2 flex justify-end"><button className="btn-primary" onClick={() => run(text, sort)} disabled={loading}>Run screen</button></div>
           </>
         )}
+        {data && <Funnel universe={data.universe} steps={funnel} />}
         <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3 text-xs">
           <span className="text-muted">Sector</span>
           <div className="relative">
@@ -347,6 +375,7 @@ function Screener() {
               <span className="num text-lg font-semibold text-white">{data.total.toLocaleString("en-IN")}</span>
               <span className="text-muted"> of {data.universe.toLocaleString("en-IN")} stocks match ({((data.total / Math.max(1, data.universe)) * 100).toFixed(1)}%)</span>
               {data.total > data.count && <span className="text-muted"> · showing first {data.count}</span>}
+              {asOf && <span className="text-muted"> · data as of {new Date(asOf).toLocaleDateString("en-IN", { dateStyle: "medium" })}</span>}
               {loading && <span className="ml-2 text-muted">updating…</span>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -362,21 +391,23 @@ function Screener() {
             </div>
           </div>
 
-          {data.total > 0 && (
-            <div className="space-y-2 border-b border-line px-4 py-3 text-xs">
-              <div className="flex flex-wrap gap-x-5 gap-y-1">
-                {summary.items.map(({ k, v, mkt }) => (
-                  <span key={k} className="text-muted">
-                    Median {fields[k]?.label ?? k} <span className="num text-white">{fmtField(v, fields[k]?.unit ?? "")}</span>
-                    {mkt !== null && <span className="num"> (market {fmtField(mkt, fields[k]?.unit ?? "")})</span>}
-                  </span>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {summary.sectors.map(([name, n]) => (
-                  <button key={name} onClick={() => setSector(name === sector ? "" : name)} title="Filter to this sector" className="rounded-full bg-white/5 px-2 py-0.5 text-[11px] text-slate-300 hover:bg-white/10">{name} <span className="num text-muted">{n}</span></button>
-                ))}
-              </div>
+          {data.total > 0 && glance && (
+            <Glance medians={glance} sizes={data.sizes} sectors={data.sectors ?? []} total={data.total}
+              onSector={(name) => setSector(name === sector ? "" : name)} activeSector={sector} />
+          )}
+
+          {data.total === 0 && (
+            <div className="px-4 py-10 text-center">
+              <p className="text-sm text-slate-200">No company passes every condition.</p>
+              {strictest >= 0 && funnel[strictest] && (
+                <p className="mt-1 text-xs text-muted">
+                  <span className="text-slate-300">{funnel[strictest].label}</span> narrows the market the most.
+                  {mode === "builder" && strictest < filters.length && (
+                    <> <button onClick={() => setFilters((fs) => fs.filter((_, i) => i !== strictest))} className="text-accent hover:underline">Remove it</button> or loosen its value.</>
+                  )}
+                  {funnel[strictest].label.startsWith("Sector:") && <> <button onClick={() => setSector("")} className="text-accent hover:underline">Show all sectors</button></>}
+                </p>
+              )}
             </div>
           )}
 
@@ -407,13 +438,14 @@ function Screener() {
                       </td>
                       <td className="px-2 py-2">
                         <Link href={`/stock/${encodeURIComponent(s.symbol)}`} className="font-medium text-white hover:text-accent">{s.symbol}</Link>
-                        <div className="max-w-[200px] truncate text-xs text-muted">{s.name}</div>
+                        <div className="max-w-[220px] truncate text-xs text-muted">{s.name}{s.sector && <span className="text-slate-500"> · {s.sector}</span>}</div>
                       </td>
                       {columns.map((c) => {
                         const v = s[c as keyof Stock] as string | number | null;
                         return (
-                          <td key={c} className={clsx("num whitespace-nowrap px-3 py-2 text-right", SIGNED.includes(c) && changeClass(v), filtered.includes(c) && "bg-accent/[0.04]")}>
-                            {fmtField(v, fields[c]?.unit ?? "")}
+                          <td key={c} className={clsx("num whitespace-nowrap px-3 py-2 text-right", SIGNED_FIELDS.has(c) && changeClass(v), filtered.includes(c) && "bg-accent/[0.04]")}>
+                            {fmtField(v, fields[c]?.unit ?? "", c)}
+                            {filtered.includes(c) && <MarketPosition pct={percentileOf(stats?.fields[c], v === null ? null : Number(v))} />}
                           </td>
                         );
                       })}

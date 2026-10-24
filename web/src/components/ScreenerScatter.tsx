@@ -93,8 +93,8 @@ export default function ScreenerScatter({ rows, fields, x, y, onAxes }: {
           <div className="pointer-events-none absolute right-2 top-2 rounded-xl border border-line bg-panel/95 px-3 py-2 text-xs shadow-xl">
             <div className="font-semibold text-white">{hover.symbol}</div>
             <div className="max-w-[220px] truncate text-muted">{hover.name}</div>
-            <div className="num mt-1 text-slate-200">{fields[x]?.label}: {fmtField(hover[x as keyof Stock] as never, unit(x))}</div>
-            <div className="num text-slate-200">{fields[y]?.label}: {fmtField(hover[y as keyof Stock] as never, unit(y))}</div>
+            <div className="num mt-1 text-slate-200">{fields[x]?.label}: {fmtField(hover[x as keyof Stock] as never, unit(x), x)}</div>
+            <div className="num text-slate-200">{fields[y]?.label}: {fmtField(hover[y as keyof Stock] as never, unit(y), y)}</div>
           </div>
         )}
       </div>

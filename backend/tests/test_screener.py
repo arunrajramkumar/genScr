@@ -63,3 +63,31 @@ def test_every_field_has_description_and_group():
 
     grouped = {f for fs in GROUPS.values() for f in fs}
     assert set(FIELDS) == set(DESCRIPTIONS) == grouped
+
+
+def test_insights_sql_params_line_up_with_placeholders():
+    from app.services.screener import insights_sql
+
+    filters = [{"field": "roe", "op": ">", "value": 15}, {"field": "pe", "op": "<", "value": 20}]
+    sql, params = insights_sql(filters, "Information Technology")
+    assert sql.count("%s") == len(params)
+    # funnel: step 1 = roe; step 2 = roe, pe; step 3 = roe, pe, sector; then 4 size buckets x (roe, pe, sector)
+    assert params == [15.0, 15.0, 20.0, 15.0, 20.0, "Information Technology"] + [15.0, 20.0, "Information Technology"] * 4
+
+
+def test_insights_maps_funnel_steps():
+    from app.services.screener import insights
+
+    row = {"step_0": 100, "step_1": 40, "step_2": 10, "size_large": 2, "size_mid": 3, "size_small": 5, "size_unknown": 0}
+    out = insights(row, [{"field": "roe", "op": ">", "value": 15}], "Energy")
+    assert out["universe"] == 100
+    assert out["funnel"] == [{"key": "roe", "remaining": 40}, {"key": "sector", "remaining": 10}]
+    assert sum(out["sizes"].values()) == 10
+
+
+def test_matches_sql_shares_params():
+    from app.services.screener import matches_sql
+
+    msql, ssql, params = matches_sql([{"field": "roe", "op": ">", "value": 15}], "Energy")
+    assert msql.count("%s") == ssql.count("%s") == len(params) == 2
+    assert "percentile_cont" in msql and "GROUP BY s.sector" in ssql

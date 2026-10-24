@@ -47,10 +47,18 @@ export function changeClass(v: Num | undefined): string {
   return n > 0 ? "text-up" : "text-down";
 }
 
-export function fmtField(v: Num | undefined, unit: string): string {
+/** Metrics that are changes (shown with a sign and up/down colour); levels like ROE or yield are not. */
+export const SIGNED_FIELDS = new Set([
+  "change_pct", "return_1m", "return_1y", "cagr_3y", "cagr_5y", "revenue_growth_yoy", "profit_growth_yoy",
+  "pct_from_52w_high", "promoter_change_1y",
+]);
+
+export function fmtField(v: Num | undefined, unit: string, field?: string): string {
+  const signed = field !== undefined && SIGNED_FIELDS.has(field);
   if (unit === "₹ Cr") return fmtCr(v);
   if (unit === "₹") return fmtPrice(v);
-  if (unit === "%") return fmtPct(v);
+  if (unit === "%") return fmtPct(v, signed);
+  if (unit === "pts") return toNum(v) === null ? "—" : `${signed && toNum(v)! > 0 ? "+" : ""}${fmtNum(v)} pts`;
   if (unit === "/9") return toNum(v) === null ? "—" : `${toNum(v)}/9`;
   if (unit === "x") return toNum(v) === null ? "—" : `${fmtNum(v)}x`;
   if (unit === "yrs") return toNum(v) === null ? "—" : `${toNum(v)} yrs`;
