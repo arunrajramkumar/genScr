@@ -47,7 +47,7 @@ export default function DeliveryChart({ symbol }: { symbol: string }) {
   useEffect(() => {
     if (!ref.current || !points?.length) return;
     const chart = createChart(ref.current, {
-      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: "#7d8aa0", fontSize: 11, fontFamily: "var(--font-mono)" },
+      layout: { background: { type: ColorType.Solid, color: "transparent" }, textColor: "#7d8aa0", fontSize: 11, fontFamily: "var(--font-mono)", attributionLogo: false }, // attribution is in the site footer (Apache-2.0 NOTICE)
       grid: { vertLines: { color: "rgba(22,30,43,0.35)" }, horzLines: { color: "rgba(22,30,43,0.35)" } },
       rightPriceScale: { borderColor: "#161e2b" },
       timeScale: { borderColor: "#161e2b", rightOffset: 4 },

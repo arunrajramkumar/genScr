@@ -30,6 +30,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           <div className="space-y-3 border-t border-line pt-6">
             <p><strong className="text-slate-400">Disclaimer:</strong> {DISCLAIMER}</p>
             <p><strong className="text-slate-400">Data:</strong> {DATA_SOURCES}</p>
+            <p>
+              <strong className="text-slate-400">Charts:</strong> TradingView Lightweight Charts™, Copyright (c) 2025 TradingView, Inc.{" "}
+              <a href="https://www.tradingview.com/" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white">tradingview.com</a>
+            </p>
             <nav className="flex flex-wrap gap-4 text-slate-400">
               <Link href="/disclaimer" className="hover:text-white">Disclaimer</Link>
               <Link href="/terms" className="hover:text-white">Terms of Use</Link>
