@@ -98,6 +98,15 @@ def test_status_chips_and_badges_state_facts_not_grades():
         assert not re.search(r'"(Strong|Weak|Average|Safe|Distress)\b', text), path
 
 
+def test_valuation_percentiles_describe_history_not_value():
+    for path in ("web/src/components/ValuationHistory.tsx", "web/src/components/ValuationBar.tsx"):
+        text = _read(path)
+        assert not re.search(r"(cheap|expensive|undervalued|overvalued|attractive|buy zone|text-(up|down))", text, re.I), path
+    history = _read("web/src/components/ValuationHistory.tsx")
+    assert "not a valuation call" in history
+    assert "weekly readings since" in history
+
+
 @pytest.mark.parametrize("config", ["web/next.config.mjs", "render.yaml"])
 def test_web_security_headers_configured(config):
     cfg = _read(config)

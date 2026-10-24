@@ -47,7 +47,10 @@ function summary(label: string, s: Series): string {
   if (s.current === null || s.min === null || s.max === null || s.median === null || !s.since) {
     return `${label} is not available for today's date.`;
   }
-  const where = s.percentile === 0 ? "Today's level is at the bottom of its range." : `Today's level is higher than ${s.percentile}% of weeks.`;
+  // Name the metric and the window so the figure reads as history, not a judgement on price.
+  const where = s.percentile === 0
+    ? `Today's ${label} is the lowest weekly reading since ${mon(s.since)}.`
+    : `Today's ${label} is higher than ${s.percentile}% of weekly readings since ${mon(s.since)}.`;
   return `${label} now ${s.current.toFixed(1)}; since ${mon(s.since)} it ranged ${s.min.toFixed(1)}–${s.max.toFixed(1)} (median ${s.median.toFixed(1)}). ${where}`;
 }
 
