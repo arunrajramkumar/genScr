@@ -27,6 +27,7 @@ const TotalReturn = dynamic(() => import("@/components/TotalReturn"), { ssr: fal
 const DividendHistory = dynamic(() => import("@/components/DividendHistory"), { ssr: false });
 const CompanyTimeline = dynamic(() => import("@/components/CompanyTimeline"), { ssr: false });
 const PeerRanks = dynamic(() => import("@/components/PeerRanks"), { ssr: false });
+const StockVsIndex = dynamic(() => import("@/components/StockVsIndex"), { ssr: false });
 const ValuationHistory = dynamic(() => import("@/components/ValuationHistory"), { ssr: false });
 const Shareholding = dynamic(() => import("@/components/Shareholding"), { ssr: false });
 const DeliveryChart = dynamic(() => import("@/components/DeliveryChart"), { ssr: false });
@@ -198,6 +199,8 @@ export default function StockView() {
       {prices && prices.length > 0 && <PriceCagr prices={prices} />}
 
       <TotalReturn symbol={stock.symbol} />
+
+      <StockVsIndex symbol={stock.symbol} memberOf={stock.indices ?? []} pe={toNum(stock.pe)} />
 
       <PeerRanks symbol={stock.symbol} />
 

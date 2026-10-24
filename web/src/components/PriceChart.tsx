@@ -243,7 +243,7 @@ export function UnderwaterChart({ series }: { series: { time: string; value: num
 }
 
 /** Single line/area series, optionally with a dashed median line (valuation history). */
-export function SimpleLineChart({ series, positive = true, median }: { series: { time: string; value: number }[]; positive?: boolean; median?: number }) {
+export function SimpleLineChart({ series, positive = true, median, refLabel = "median" }: { series: { time: string; value: number }[]; positive?: boolean; median?: number; refLabel?: string }) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -256,11 +256,11 @@ export function SimpleLineChart({ series, positive = true, median }: { series: {
     });
     line.setData(series);
     if (median !== undefined) {
-      line.createPriceLine({ price: median, color: "#f5b942", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: "median" });
+      line.createPriceLine({ price: median, color: "#f5b942", lineWidth: 1, lineStyle: 2, axisLabelVisible: true, title: refLabel });
     }
     chart.timeScale().fitContent();
     return () => chart.remove();
-  }, [series, positive, median]);
+  }, [series, positive, median, refLabel]);
 
   return <div ref={ref} className="h-[260px] w-full sm:h-[340px]" />;
 }
