@@ -62,11 +62,11 @@ def build_facts(stock: dict, prices: list[dict], fy: list[dict], rank: dict | No
             if np_ > 0:
                 hourly = per_day / 24
                 per_hour = f"₹{hourly:.1f} Cr" if hourly >= 1 else f"₹{hourly * 100:.1f} lakh"
-                add("profit_per_day", "coins", "Profit machine",
+                add("profit_per_day", "coins", "Profit per day",
                     f"Earned ₹{inr(per_day, 1 if per_day < 100 else 0)} Cr of profit every single day in {label}, "
                     f"about {per_hour} an hour.", src)
             else:
-                add("loss_per_day", "flame", "Burning cash", f"Lost about ₹{inr(-per_day, 1)} Cr per day in {label}.", src)
+                add("loss_per_day", "flame", "Loss per day", f"Lost about ₹{inr(-per_day, 1)} Cr per day in {label}.", src)
 
         if latest.get("total_debt") == 0 and latest.get("total_assets"):
             add("debt_free", "shield", "Debt-free",
@@ -83,10 +83,10 @@ def build_facts(stock: dict, prices: list[dict], fy: list[dict], rank: dict | No
             mult = r1 / r0
             span = f"{fy_label(oldest['period_end'])} to {label}"
             if mult >= 1.5:
-                add("revenue_multiple", "trending", "Growth spurt",
+                add("revenue_multiple", "trending", "Revenue growth",
                     f"Revenue grew {mult:.1f}x from ₹{inr(r0)} Cr to ₹{inr(r1)} Cr ({span}).", FILINGS)
             elif mult <= 0.75:
-                add("revenue_shrink", "trending-down", "Shrinking sales",
+                add("revenue_shrink", "trending-down", "Revenue decline",
                     f"Revenue fell {(1 - mult) * 100:.0f}% from ₹{inr(r0)} Cr to ₹{inr(r1)} Cr ({span}).", FILINGS)
 
     # --- From NSE listing / ranks --------------------------------------------
@@ -94,18 +94,18 @@ def build_facts(stock: dict, prices: list[dict], fy: list[dict], rank: dict | No
     if listed:
         years = (today - listed).days // 365
         if years >= 1:
-            add("listed_since", "calendar", "Market veteran" if years >= 20 else "On the exchange",
+            add("listed_since", "calendar", "Years listed",
                 f"Listed on NSE since {_dmy(listed)}, {years} years of public trading.", "NSE equity list")
 
     if rank and rank.get("total", 0) >= 100:
         if rank["rank"] <= 50:
-            add("mcap_rank", "crown", "Heavyweight",
+            add("mcap_rank", "crown", "Market-cap rank",
                 f"#{rank['rank']} most valuable of the {rank['total']} NSE companies genScr tracks.", MCAP)
         if stock.get("sector") and rank.get("sector_rank") == 1 and rank.get("sector_total", 0) >= 5:
-            add("sector_leader", "trophy", "Sector leader",
+            add("sector_leader", "trophy", "Largest in its sector",
                 f"The most valuable company in {stock['sector']} among {rank['sector_total']} tracked peers.", MCAP)
         elif stock.get("sector") and rank.get("sector_rank", 99) <= 3 and rank.get("sector_total", 0) >= 5:
-            add("sector_top3", "trophy", "Top of its class",
+            add("sector_top3", "trophy", "Top 3 in its sector by size",
                 f"#{rank['sector_rank']} most valuable in {stock['sector']} among {rank['sector_total']} tracked peers.", MCAP)
 
     # --- From prices -----------------------------------------------------------
@@ -125,7 +125,7 @@ def build_facts(stock: dict, prices: list[dict], fy: list[dict], rank: dict | No
                 add("best_day", "zap", "Biggest single-day jump",
                     f"+{best[0] * 100:.1f}% on {_dmy(best[1])}, its best session since {since}.", BHAV)
             if worst[0] <= -0.05:
-                add("worst_day", "zap-off", "Toughest day",
+                add("worst_day", "zap-off", "Biggest single-day fall",
                     f"{worst[0] * 100:.1f}% on {_dmy(worst[1])}, its worst session since {since}.", BHAV)
 
         streak = best_streak = 0
@@ -138,8 +138,8 @@ def build_facts(stock: dict, prices: list[dict], fy: list[dict], rank: dict | No
             else:
                 streak = 0
         if best_streak >= 7:
-            add("win_streak", "flame", "Hot streak",
-                f"Rose {best_streak} sessions in a row, its longest winning run since {since} (ended {_dmy(streak_end)}).", BHAV)
+            add("win_streak", "flame", "Longest run of up days",
+                f"Rose {best_streak} sessions in a row, its longest such run since {since} (ended {_dmy(streak_end)}).", BHAV)
 
         adj = adjust(rows, actions)
         peak = max(adj, key=lambda r: r["close"] or 0)
@@ -148,7 +148,7 @@ def build_facts(stock: dict, prices: list[dict], fy: list[dict], rank: dict | No
             gap = (cur / peak["close"] - 1) * 100
             text = (f"Closed at its highest level since {since} on {_dmy(peak['trade_date'])}"
                     + (" and is right there now." if gap > -2 else f"; it trades {abs(gap):.0f}% below that peak today."))
-            add("peak", "mountain", "Record watch", text, BHAV_ADJ)
+            add("peak", "mountain", "Highest close in the data", text, BHAV_ADJ)
 
         year_end: dict[int, float] = {}
         for r in adj:
@@ -157,7 +157,7 @@ def build_facts(stock: dict, prices: list[dict], fy: list[dict], rank: dict | No
         full = [y for y in years_sorted[1:] if y < today.year]
         if len(full) >= 4:
             ups = sum(1 for y in full if year_end[y] > year_end[y - 1])
-            add("up_years", "calendar-check", "Consistency check",
+            add("up_years", "calendar-check", "Calendar years up",
                 f"Ended higher in {ups} of {len(full)} calendar years ({full[0]} to {full[-1]}).", BHAV_ADJ)
 
     priority = ["profit_per_day", "loss_per_day", "best_day", "mcap_rank", "sector_leader", "revenue_multiple", "debt_free",

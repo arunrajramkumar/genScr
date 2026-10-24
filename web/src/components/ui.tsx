@@ -57,16 +57,20 @@ export function ErrorNote({ message, hint }: { message: string; hint?: ReactNode
   );
 }
 
-/** Colour-coded badge for Piotroski (0-9) or Altman Z''. */
+/** Badge for Piotroski (0-9) or Altman Z'': states which band the score falls in, not a grade. */
 export function ScoreBadge({ kind, value }: { kind: "piotroski" | "altman"; value: Num | undefined }) {
   const n = toNum(value);
   if (n === null) return <span className="text-muted">—</span>;
   const [tone, text] =
     kind === "piotroski"
-      ? n >= 7 ? ["up", "Strong"] : n >= 4 ? ["mid", "Average"] : ["down", "Weak"]
-      : n > 2.6 ? ["up", "Safe"] : n >= 1.1 ? ["mid", "Grey zone"] : ["down", "Distress"];
+      ? n >= 7 ? ["up", "band 7–9"] : n >= 4 ? ["mid", "band 4–6"] : ["down", "band 0–3"]
+      : n > 2.6 ? ["up", "above 2.6"] : n >= 1.1 ? ["mid", "1.1–2.6"] : ["down", "below 1.1"];
+  const title = kind === "piotroski"
+    ? "Piotroski F-score: count of 9 accounting tests passed (profitability, leverage, efficiency)"
+    : "Altman Z'': the model's authors call scores above 2.6 the 'safe' zone and below 1.1 the 'distress' zone";
   return (
     <span
+      title={title}
       className={clsx(
         "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium",
         tone === "up" && "bg-up/15 text-up",

@@ -86,10 +86,16 @@ def test_analytics_sections_have_inline_notes():
 
 def test_technical_states_are_not_colour_coded_as_buy_or_sell():
     signals = _read("web/src/components/Signals.tsx")
-    assert not re.search(r"(overbought|oversold)", signals, re.I)
+    assert not re.search(r"(overbought|oversold|uptrend|downtrend|bullish|bearish)", signals, re.I)
     for line in signals.splitlines():
-        if "RSI" in line and "out.push" in line:
+        if "out.push" in line and re.search(r"RSI|average|52-week", line):
             assert 'tone: "neutral"' in line, line
+
+
+def test_status_chips_and_badges_state_facts_not_grades():
+    for path in ("web/src/components/Signals.tsx", "web/src/components/ui.tsx"):
+        text = _read(path)
+        assert not re.search(r'"(Strong|Weak|Average|Safe|Distress)\b', text), path
 
 
 @pytest.mark.parametrize("config", ["web/next.config.mjs", "render.yaml"])
