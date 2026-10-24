@@ -9,9 +9,14 @@ export default function TickerTape({ stocks }: { stocks: Stock[] }) {
   const items = [...stocks, ...stocks]; // duplicated for a seamless loop
   return (
     <div className="group relative overflow-hidden border-y border-white/[0.06] bg-black/40 py-2 [mask-image:linear-gradient(90deg,transparent,black_6%,black_94%,transparent)]">
-      <div className="flex w-max animate-marquee gap-8 group-hover:[animation-play-state:paused]">
+      <div className="flex w-max animate-marquee gap-8 group-focus-within:[animation-play-state:paused] group-hover:[animation-play-state:paused]">
         {items.map((s, i) => (
-          <Link key={`${s.symbol}-${i}`} href={`/stock/${encodeURIComponent(s.symbol)}`} className="flex items-center gap-2 whitespace-nowrap text-sm hover:opacity-80">
+          <Link
+            key={`${s.symbol}-${i}`}
+            href={`/stock/${encodeURIComponent(s.symbol)}`}
+            className="flex items-center gap-2 whitespace-nowrap text-sm hover:opacity-80"
+            {...(i >= stocks.length ? { "aria-hidden": true, tabIndex: -1 } : {})}
+          >
             <span className="font-semibold text-white">{s.symbol}</span>
             <span className="num text-slate-300">{fmtPrice(s.close)}</span>
             <span className={clsx("num text-xs", changeClass(s.change_pct))}>

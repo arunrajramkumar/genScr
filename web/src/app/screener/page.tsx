@@ -153,12 +153,20 @@ function Screener() {
     }).catch((e) => setError(e.message));
   }, []);
 
-  const query = mode === "builder" ? toQuery(filters) : text;
+  const builderQuery = toQuery(filters);
+  const query = mode === "builder" ? builderQuery : text;
+  const inflight = useRef<AbortController | null>(null);
 
   const run = useCallback((q: string, s: { field: string; order: "asc" | "desc" }) => {
+    inflight.current?.abort(); // drop out-of-order responses
+    const ctrl = new AbortController();
+    inflight.current = ctrl;
     setLoading(true);
     setError(null);
-    api<Result>("/screener", { method: "POST", body: JSON.stringify({ query: q, sector: sector || null, sort: s.field, order: s.order, limit: 300 }) })
+    api<Result>("/screener", {
+      method: "POST", signal: ctrl.signal,
+      body: JSON.stringify({ query: q, sector: sector || null, sort: s.field, order: s.order, limit: 300 }),
+    })
       .then((d) => {
         setData(d);
         const qs = new URLSearchParams();
@@ -166,20 +174,21 @@ function Screener() {
         if (sector) qs.set("sector", sector);
         router.replace(`/screener?${qs.toString()}`, { scroll: false });
       })
-      .catch((e) => setError(e.message))
-      .finally(() => setLoading(false));
+      .catch((e) => { if (!ctrl.signal.aborted) setError(e.message); })
+      .finally(() => { if (inflight.current === ctrl) setLoading(false); });
   }, [sector, router]);
 
-  // Live results while editing the builder (debounced); text mode runs on demand and on sector change.
+  // Live results while editing the builder (debounced). Text mode runs on demand (button / Ctrl+Enter)
+  // and when sort or sector change - never per keystroke.
   useEffect(() => {
     if (!ready) return;
     if (mode === "text") {
       run(textRef.current, sort);
       return;
     }
-    const t = setTimeout(() => run(query, sort), 450);
+    const t = setTimeout(() => run(builderQuery, sort), 450);
     return () => clearTimeout(t);
-  }, [ready, query, mode, run, sort]);
+  }, [ready, builderQuery, mode, run, sort]);
 
   const update = (id: number, patch: Partial<Filter>) => setFilters((fs) => fs.map((f) => (f.id === id ? { ...f, ...patch } : f)));
   const addFilter = (field: string) => {

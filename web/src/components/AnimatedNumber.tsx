@@ -8,6 +8,11 @@ export default function AnimatedNumber({ value, format }: { value: number; forma
   const from = useRef(0);
 
   useEffect(() => {
+    if (typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches) {
+      setShown(value);
+      from.current = value;
+      return;
+    }
     const start = performance.now();
     const begin = from.current;
     let raf = 0;

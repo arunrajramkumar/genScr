@@ -127,7 +127,7 @@ export function StockChart({ data }: { data: Candle[] }) {
           <span>Vol <span className="text-slate-200">{fmtVolume(shown.volume)}</span></span>
         </div>
       )}
-      <div ref={ref} className="h-[400px] w-full" />
+      <div ref={ref} className="h-[280px] w-full sm:h-[400px]" />
     </div>
   );
 }

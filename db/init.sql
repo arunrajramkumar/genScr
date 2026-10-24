@@ -122,6 +122,40 @@ CREATE TABLE IF NOT EXISTS corporate_actions (
 );
 CREATE INDEX IF NOT EXISTS corporate_actions_date_idx ON corporate_actions (ex_date);
 
+-- Daily closes and valuation of every NSE index (from NSE's ind_close_all file).
+CREATE TABLE IF NOT EXISTS index_prices (
+    index_name   TEXT NOT NULL,
+    trade_date   DATE NOT NULL,
+    open         NUMERIC(14, 2),
+    high         NUMERIC(14, 2),
+    low          NUMERIC(14, 2),
+    close        NUMERIC(14, 2),
+    change_pct   NUMERIC(8, 2),
+    pe           NUMERIC(8, 2),
+    pb           NUMERIC(8, 2),
+    div_yield    NUMERIC(6, 2),
+    turnover_cr  NUMERIC(16, 2),
+    PRIMARY KEY (index_name, trade_date)
+);
+CREATE INDEX IF NOT EXISTS index_prices_date_idx ON index_prices (trade_date);
+
+-- Index membership (from NSE's index constituent files).
+CREATE TABLE IF NOT EXISTS index_constituents (
+    index_name  TEXT NOT NULL,
+    symbol      TEXT NOT NULL,
+    updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    PRIMARY KEY (index_name, symbol)
+);
+CREATE INDEX IF NOT EXISTS index_constituents_symbol_idx ON index_constituents (symbol);
+
+-- Ticker renames (e.g. ZOMATO -> ETERNAL), used to stitch price history together.
+CREATE TABLE IF NOT EXISTS symbol_changes (
+    old_symbol      TEXT NOT NULL,
+    new_symbol      TEXT NOT NULL,
+    effective_date  DATE NOT NULL,
+    PRIMARY KEY (old_symbol, new_symbol, effective_date)
+);
+
 -- Migrations for databases created before these columns existed (safe to re-run).
 ALTER TABLE fundamentals  ADD COLUMN IF NOT EXISTS dividends_paid NUMERIC(18, 2);
 ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS dividend_yield NUMERIC(8, 2);

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import {
-  BadgeCheck, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, Coins, Crown, Flame, Lightbulb, Mountain,
+  BadgeCheck, CalendarCheck, CalendarDays, ChevronLeft, ChevronRight, Coins, Crown, Flame, Lightbulb, Mountain, Pause, Play,
   Shield, TrendingDown, TrendingUp, Trophy, Wallet, Zap, ZapOff, type LucideIcon,
 } from "lucide-react";
 import { api } from "@/lib/api";
@@ -20,7 +20,9 @@ const ROTATE_MS = 7000;
 export default function DidYouKnow({ symbol }: { symbol: string }) {
   const [facts, setFacts] = useState<Fact[] | null>(null);
   const [i, setI] = useState(0);
-  const [paused, setPaused] = useState(false);
+  const [hovered, setHovered] = useState(false);
+  const [stopped, setStopped] = useState(false); // explicit pause (WCAG 2.2.2)
+  const paused = hovered || stopped;
 
   useEffect(() => {
     setFacts(null);
@@ -41,8 +43,10 @@ export default function DidYouKnow({ symbol }: { symbol: string }) {
 
   return (
     <aside
-      onMouseEnter={() => setPaused(true)}
-      onMouseLeave={() => setPaused(false)}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      onFocus={() => setHovered(true)}
+      onBlur={() => setHovered(false)}
       className="panel relative flex h-full flex-col overflow-hidden p-5"
     >
       <div className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-gold/10 blur-3xl" />
@@ -77,6 +81,9 @@ export default function DidYouKnow({ symbol }: { symbol: string }) {
           ))}
         </div>
         <div className="flex gap-1">
+          <button onClick={() => setStopped((s) => !s)} className="rounded-md border border-line p-1 text-muted hover:text-white" aria-label={stopped ? "Resume rotating facts" : "Pause rotating facts"} aria-pressed={stopped}>
+            {stopped ? <Play className="h-4 w-4" /> : <Pause className="h-4 w-4" />}
+          </button>
           <button onClick={() => go(-1)} className="rounded-md border border-line p-1 text-muted hover:text-white" aria-label="Previous fact"><ChevronLeft className="h-4 w-4" /></button>
           <button onClick={() => go(1)} className="rounded-md border border-line p-1 text-muted hover:text-white" aria-label="Next fact"><ChevronRight className="h-4 w-4" /></button>
         </div>

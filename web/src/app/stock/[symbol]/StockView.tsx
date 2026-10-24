@@ -125,7 +125,7 @@ export default function StockView() {
               <GitCompare className="h-3.5 w-3.5" /> Compare with peers
             </Link>
           </div>
-          {prices === null ? <Loading /> : prices.length ? <StockChart data={prices} /> : <div className="py-16 text-center text-sm text-muted">No price history</div>}
+          {prices === null ? <div className="h-[340px] animate-pulse rounded-xl bg-white/[0.03] sm:h-[460px]" aria-label="Loading chart" /> : prices.length ? <StockChart data={prices} /> : <div className="py-16 text-center text-sm text-muted">No price history</div>}
         </section>
         <DidYouKnow symbol={stock.symbol} />
       </div>

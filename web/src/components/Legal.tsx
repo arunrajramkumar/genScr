@@ -51,9 +51,9 @@ export function DisclaimerNotice() {
     <div role="note" className="fixed inset-x-0 bottom-0 z-50 border-t border-amber-500/30 bg-bg/95 backdrop-blur">
       <div className="mx-auto flex max-w-7xl items-center gap-3 px-4 py-3 text-sm">
         <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" />
-        <span className="text-slate-300">
-          {DISCLAIMER_SHORT} Data may be delayed or inaccurate.{" "}
-          <Link href="/disclaimer" className="text-accent underline-offset-2 hover:underline">Read the full disclaimer</Link>.
+        <span className="text-xs text-slate-300 sm:text-sm">
+          {DISCLAIMER_SHORT}<span className="hidden sm:inline"> Data may be delayed or inaccurate.</span>{" "}
+          <Link href="/disclaimer" className="text-accent underline-offset-2 hover:underline">Disclaimer</Link>
         </span>
         <button onClick={dismiss} className="btn ml-auto shrink-0 text-xs" aria-label="Dismiss disclaimer notice">
           I understand <X className="h-3.5 w-3.5" />

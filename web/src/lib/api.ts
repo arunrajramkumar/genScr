@@ -9,10 +9,11 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   for (let attempt = 0; ; attempt++) {
     let res: Response;
     try {
+      // Plain GETs avoid a CORS preflight; JSON bodies (POST) declare their type.
+      // The browser cache honours the API's Cache-Control (data changes once a day).
       res = await fetch(`${API_URL}/api${path}`, {
         ...init,
-        headers: { "Content-Type": "application/json", ...init?.headers },
-        cache: "no-store",
+        headers: init?.body ? { "Content-Type": "application/json", ...init.headers } : init?.headers,
       });
     } catch (e) {
       if (init?.signal?.aborted || attempt >= RETRY_DELAYS_MS.length) throw e;

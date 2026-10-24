@@ -27,6 +27,7 @@ app.add_middleware(
     allow_origins=[o.strip() for o in settings.cors_origins.split(",") if o.strip()],
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
+    max_age=86400,  # browsers cache the preflight for a day
 )
 
 for module in (search, stocks, screener, compare, market):

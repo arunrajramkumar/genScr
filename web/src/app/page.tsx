@@ -63,7 +63,7 @@ export default function Home() {
           Fundamentals, quality scores, technicals and comparisons, built on public exchange data. Free and transparent.
         </p>
         <div className="mx-auto mt-8 max-w-2xl">
-          <SearchBox large autoFocus />
+          <SearchBox large />
         </div>
         <div className="mt-4 flex flex-wrap justify-center gap-2">
           <Link href="/screener" className="chip inline-flex items-center gap-1.5">

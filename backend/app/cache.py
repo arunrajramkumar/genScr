@@ -94,7 +94,7 @@ def ensure_fresh(conn, now: float | None = None) -> None:
     _version["value"] = value
 
 
-def cached(ttl: float = 43200, maxsize: int = 256, max_age: int = 300):
+def cached(ttl: float = 43200, maxsize: int = 256, max_age: int = 1800):
     """Cache a route's JSON output by its arguments (excluding the DB connection).
 
     ttl: server-side lifetime (entries are also dropped as soon as the data changes);
