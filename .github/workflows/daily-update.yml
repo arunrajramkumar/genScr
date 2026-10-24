@@ -129,6 +129,7 @@ jobs:
           start=$(psql "$DATABASE_URL" -At -c "SELECT min(trade_date) FROM prices")
           python -u -m app.ingest.bhavcopy --from "${start:-2021-01-01}" --skip-existing
           python -u -m app.ingest.indices --from "${start:-2021-01-01}" --trading-days-only
+          python -u -m app.ingest.delivery --from "$(date -u -d '1 year ago' +%F)"
 
       - name: Latest results filings (Nifty 500)
         if: env.TASK == 'fundamentals' || env.TASK == 'all'
