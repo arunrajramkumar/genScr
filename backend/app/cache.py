@@ -87,8 +87,10 @@ def ensure_fresh(conn, now: float | None = None) -> None:
     if now - _version["checked"] < VERSION_CHECK_SECONDS:
         return
     _version["checked"] = now
-    row = conn.execute("SELECT max(updated_at) AS v FROM stock_metrics").fetchone()
-    value = row["v"] if row else None
+    row = conn.execute(
+        "SELECT (SELECT max(updated_at) FROM stock_metrics) AS v, (SELECT max(trade_date) FROM index_prices) AS i"
+    ).fetchone()
+    value = (row["v"], row.get("i")) if row else None
     if _version["value"] is not None and value != _version["value"]:
         clear_all()
     _version["value"] = value

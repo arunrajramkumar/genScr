@@ -102,6 +102,13 @@ jobs:
         working-directory: backend
         run: python -u -m app.ingest.bhavcopy --from "$SINCE"
 
+      - name: Ticker renames, index history and constituents
+        continue-on-error: true
+        working-directory: backend
+        run: |
+          python -u -m app.ingest.symbol_changes
+          python -u -m app.ingest.indices --from "$SINCE" --trading-days-only
+
       - name: Corporate actions since 2005 (dividends, bonuses, splits)
         continue-on-error: true # NSE may refuse cloud IPs; prices are still loaded
         working-directory: backend
@@ -130,7 +137,7 @@ jobs:
             echo "### Hosted database contents"
             echo '| Table | Rows |'
             echo '|---|---|'
-            for t in stocks prices fundamentals stock_metrics corporate_actions; do
+            for t in stocks prices fundamentals stock_metrics corporate_actions index_prices index_constituents; do
               echo "| $t | $(psql "$TARGET_URL" -At -c "SELECT count(*) FROM $t" 2>/dev/null || echo '?') |"
             done
           } >> "$GITHUB_STEP_SUMMARY"

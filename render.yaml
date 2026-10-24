@@ -46,6 +46,12 @@ services:
       - type: rewrite # one prebuilt shell serves every /stock/<SYMBOL>
         source: /stock/*
         destination: /stock/_/index.html
+      - type: rewrite # real page, listed before the catch-all below
+        source: /indices/compare/*
+        destination: /indices/compare/index.html
+      - type: rewrite # one prebuilt shell serves every /indices/<slug>
+        source: /indices/*
+        destination: /indices/_/index.html
     headers:
       - path: /*
         name: X-Content-Type-Options

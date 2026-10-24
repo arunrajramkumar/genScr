@@ -74,10 +74,28 @@ jobs:
         working-directory: backend
         run: python -u -m app.ingest.equity_list
 
+      - name: Index constituents
+        if: env.TASK == 'stocks' || env.TASK == 'all'
+        continue-on-error: true
+        working-directory: backend
+        run: python -u -m app.ingest.indices --constituents-only
+
       - name: Latest daily prices
         if: env.TASK == 'prices' || env.TASK == 'all'
         working-directory: backend
         run: python -u -m app.ingest.bhavcopy --lookback 10
+
+      - name: Index closes (last 10 days)
+        if: env.TASK == 'prices' || env.TASK == 'all'
+        continue-on-error: true
+        working-directory: backend
+        run: python -u -m app.ingest.indices
+
+      - name: Stitch ticker renames
+        if: env.TASK == 'prices' || env.TASK == 'stocks' || env.TASK == 'all' || env.TASK == 'repair-history'
+        continue-on-error: true
+        working-directory: backend
+        run: python -u -m app.ingest.symbol_changes
 
       - name: Corporate actions (last 15 days)
         if: env.TASK == 'prices' || env.TASK == 'all'
@@ -96,6 +114,7 @@ jobs:
         run: |
           start=$(psql "$DATABASE_URL" -At -c "SELECT min(trade_date) FROM prices")
           python -u -m app.ingest.bhavcopy --from "${start:-2021-01-01}" --skip-existing
+          python -u -m app.ingest.indices --from "${start:-2021-01-01}" --trading-days-only
 
       - name: Latest results filings (Nifty 500)
         if: env.TASK == 'fundamentals' || env.TASK == 'all'

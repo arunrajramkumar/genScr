@@ -60,6 +60,12 @@ def get_stock(symbol: str, conn=Depends(get_conn)):
     ).fetchone()
     if not row:
         raise HTTPException(404, f"{symbol} not found")
+    try:
+        row["indices"] = [r["index_name"] for r in conn.execute(
+            "SELECT index_name FROM index_constituents WHERE symbol = %s ORDER BY index_name", (symbol,))]
+    except psycopg.errors.UndefinedTable:
+        conn.rollback()
+        row["indices"] = []
     return row
 
 
@@ -192,7 +198,27 @@ def get_total_return(
         raise HTTPException(404, "Not enough price history for that period")
     first = prices[0]["trade_date"]
     result["available_years"] = int((end - first).days / 365.25 + 0.02)
+    result["benchmark"] = _benchmark(conn, "Nifty 50", date.fromisoformat(result["start_date"]), end, amount)
     return result
+
+
+def _benchmark(conn, index_name: str, start: date, end: date, amount: float) -> dict | None:
+    """Same amount in the index over the same dates (price index: index dividends are not included)."""
+    try:
+        rows = conn.execute(
+            "SELECT trade_date, close FROM index_prices "
+            "WHERE index_name = %s AND trade_date BETWEEN %s AND %s ORDER BY trade_date",
+            (index_name, start, end),
+        ).fetchall()
+    except psycopg.errors.UndefinedTable:
+        conn.rollback()
+        return None
+    if len(rows) < 2 or rows[0]["trade_date"] > start.replace(day=min(start.day + 7, 28)):
+        return None
+    value = amount * rows[-1]["close"] / rows[0]["close"]
+    years = (rows[-1]["trade_date"] - rows[0]["trade_date"]).days / 365.25
+    return {"name": index_name, "value": round(value, 2),
+            "cagr": round(((value / amount) ** (1 / years) - 1) * 100, 2) if years >= 1 else None}
 
 
 @router.get("/{symbol}/risk")

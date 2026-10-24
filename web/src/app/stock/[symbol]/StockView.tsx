@@ -91,6 +91,13 @@ export default function StockView() {
               <span className="num rounded-full border border-line px-2 py-0.5 text-[10px] text-muted">NSE</span>
             </div>
             <div className="mt-1 text-muted">{stock.name}</div>
+            {stock.indices && stock.indices.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {stock.indices.map((n) => (
+                  <Link key={n} href={`/indices/${n.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}`} className="rounded-md border border-accent/30 bg-accent/10 px-2 py-0.5 text-[11px] text-accent hover:bg-accent/20">{n}</Link>
+                ))}
+              </div>
+            )}
             <div className="mt-4"><Signals stock={stock} /></div>
           </div>
           <div className="text-right">

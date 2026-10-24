@@ -80,6 +80,15 @@ export default function TotalReturn({ symbol }: { symbol: string }) {
             <Outcome icon={<Sparkles className="h-4 w-4" />} title="Dividends reinvested" note="Bought more shares each time" value={best.total_value} cagr={best.cagr} tone={up ? "up" : "down"} highlight />
           </div>
 
+          {data.benchmark && (
+            <p className="mt-3 text-xs text-muted">
+              For context, the same {inr(data.amount)} in the {data.benchmark.name} index over the same dates would be{" "}
+              <span className="num text-slate-200">{inr(data.benchmark.value)}</span>
+              {data.benchmark.cagr !== null && <span className="num"> ({data.benchmark.cagr > 0 ? "+" : ""}{data.benchmark.cagr.toFixed(1)}% p.a.)</span>}
+              , price index, excluding index dividends.
+            </p>
+          )}
+
           <div className="mt-5 grid gap-5 lg:grid-cols-[1fr_1.2fr]">
             <div className="space-y-2 text-sm">
               <div className="label mb-1">Where the money came from</div>

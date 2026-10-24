@@ -9,6 +9,7 @@ import { SITE_NAME } from "@/lib/site";
 
 const LINKS = [
   { href: "/", label: "Markets" },
+  { href: "/indices", label: "Indices" },
   { href: "/screener", label: "Screener" },
   { href: "/compare", label: "Compare" },
 ];

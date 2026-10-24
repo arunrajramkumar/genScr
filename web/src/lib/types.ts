@@ -33,6 +33,7 @@ export interface Metrics {
 }
 
 export interface Stock extends Partial<Metrics> {
+  indices?: string[];
   symbol: string;
   name: string;
   sector: string | null;
@@ -133,6 +134,7 @@ export interface TotalReturnResponse {
   events: ReturnEvent[];
   series: { time: string; price: number; cash: number; reinvest: number }[];
   caveats: string[];
+  benchmark?: { name: string; value: number; cagr: number | null } | null;
 }
 
 export interface DividendPayment {
@@ -211,4 +213,33 @@ export interface RanksResponse {
   sector: string | null;
   sector_size: number;
   metrics: RankMetric[];
+}
+
+export interface IndexSummary {
+  name: string;
+  slug: string;
+  category: string;
+  as_of: string;
+  close: number;
+  change_pct: number | null;
+  return_1m: number | null;
+  return_ytd: number | null;
+  return_1y: number | null;
+  cagr_3y: number | null;
+  cagr_5y: number | null;
+  pe: number | null;
+  pb: number | null;
+  div_yield: number | null;
+  pe_percentile: number | null;
+  pb_percentile: number | null;
+  since: string;
+}
+
+export interface IndexDetail {
+  summary: IndexSummary;
+  prices: { time: string; value: number }[];
+  valuation: { time: string; pe: number | null; pb: number | null; div_yield: number | null }[];
+  risk: RiskResponse | null;
+  constituents: Stock[];
+  sector_mix: [string, number][];
 }
