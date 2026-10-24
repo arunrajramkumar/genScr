@@ -1,11 +1,15 @@
 """Rebuild the `stock_metrics` snapshot from prices + fundamentals.
 
-    python -m app.ingest.compute_metrics
+    python -m app.ingest.compute_metrics                 # full rebuild (after new prices)
+    python -m app.ingest.compute_metrics --skip-prices   # only fundamentals, dividends, promoter holding (seconds)
 """
 
+import argparse
 from collections import defaultdict
+from datetime import date
 from decimal import Decimal
-from itertools import groupby
+
+from psycopg.rows import tuple_row
 
 from app.db import connect
 from app.services.adjust import adjust
@@ -23,6 +27,20 @@ COLUMNS = [
 ]
 
 MIN_DELIV_DAYS = 10  # 20-day delivery average needs at least this many days with a figure
+HISTORY_DAYS = 1900  # ~5 years of trading, for the 5-year CAGR
+RECENT_DAYS = 400  # older rows only need close/prev_close (CAGR and split detection)
+PRICE_COLS = ["symbol", "trade_date", "close", "prev_close", "high", "low", "volume", "turnover", "deliv_pct"]
+PRICE_COLUMNS = COLUMNS[2:COLUMNS.index("market_cap")] + ["cagr_3y", "cagr_5y", "volatility_1y", "deliv_pct", "deliv_pct_avg_20d"]
+
+# No ORDER BY: on a small hosted Postgres that can't cache the table, an index-ordered scan is mostly random disk
+# reads; a plain sequential scan sorted client-side is several times faster. Old rows ship without unused columns.
+PRICES_SQL = f"""
+SELECT symbol, trade_date, close, prev_close,
+       CASE WHEN recent THEN high END, CASE WHEN recent THEN low END, CASE WHEN recent THEN volume END,
+       CASE WHEN recent THEN turnover END, CASE WHEN recent THEN deliv_pct END
+FROM (SELECT *, trade_date > %(as_of)s::date - {RECENT_DAYS} AS recent
+      FROM prices WHERE trade_date > %(as_of)s::date - {HISTORY_DAYS}) p
+"""
 
 UPSERT = f"""
 INSERT INTO stock_metrics ({", ".join(COLUMNS)}, updated_at)
@@ -43,13 +61,14 @@ def _round(v, nd=2):
 def price_metrics(rows: list[dict]) -> dict:
     closes = [_f(r["close"]) for r in rows if r["close"] is not None]
     last = rows[-1]
-    year = rows[-252:]
+    since = date.fromordinal(last["trade_date"].toordinal() - 365)
+    year = [r for r in rows[-252:] if r["trade_date"] > since]  # 52 weeks by date, even for rarely traded stocks
     highs = [_f(r["high"]) for r in year if r["high"] is not None]
     lows = [_f(r["low"]) for r in year if r["low"] is not None]
     close = closes[-1] if closes else None
     prev = _f(last["prev_close"]) or (closes[-2] if len(closes) > 1 else None)
     high_52w = max(highs) if highs else None
-    vols = [r["volume"] or 0 for r in rows[-20:]]
+    vols = [r["volume"] for r in rows[-20:] if r["volume"] is not None]
     deliv = [_f(r["deliv_pct"]) for r in rows[-20:] if r.get("deliv_pct") is not None]
     return {
         "close": close,
@@ -72,7 +91,30 @@ def price_metrics(rows: list[dict]) -> dict:
     }
 
 
-def run() -> int:
+def _from_prices(conn, as_of, actions):
+    """(symbol, price metrics) for every symbol that traded on `as_of`, from ~5 years of split-adjusted prices."""
+    by_symbol: dict[str, list[tuple]] = defaultdict(list)
+    with conn.cursor(name="metrics_prices", row_factory=tuple_row) as stream:
+        stream.itersize = 50_000
+        stream.execute(PRICES_SQL, {"as_of": as_of})
+        for r in stream:
+            by_symbol[r[0]].append(r)
+    for symbol in sorted(by_symbol):
+        raw = sorted(by_symbol.pop(symbol), key=lambda r: r[1])  # pop: free memory as we go
+        if raw[-1][1] != as_of:
+            continue  # not traded on the latest day (suspended / delisted)
+        rows = adjust([{c: _f(v) for c, v in zip(PRICE_COLS, r, strict=True)} for r in raw], actions.get(symbol) or None)
+        yield symbol, {"as_of": as_of, **price_metrics(rows)}
+
+
+def _existing(conn):
+    """(symbol, price metrics) as last computed, for runs that only refresh fundamentals."""
+    cols = ", ".join(["symbol", "as_of", *PRICE_COLUMNS])
+    for r in conn.execute(f"SELECT {cols} FROM stock_metrics WHERE as_of = (SELECT max(as_of) FROM stock_metrics)"):
+        yield r["symbol"], {k: _f(v) for k, v in r.items() if k != "symbol"}
+
+
+def run(skip_prices: bool = False) -> int:
     with connect() as conn:
         as_of = conn.execute("SELECT max(trade_date) AS d FROM prices").fetchone()["d"]
         if as_of is None:
@@ -115,35 +157,21 @@ def run() -> int:
                 """
             )}
 
-        # Stream ~5 years of prices one symbol at a time (a server-side cursor keeps memory flat).
         out = []
-        with conn.cursor(name="metrics_prices") as stream:
-            stream.itersize = 20_000
-            stream.execute(
-                """
-                SELECT symbol, trade_date, close, prev_close, high, low, volume, turnover, deliv_pct
-                FROM prices WHERE trade_date > %s::date - 1900
-                ORDER BY symbol, trade_date
-                """,
-                (as_of,),
-            )
-            for symbol, group in groupby(stream, key=lambda r: r["symbol"]):
-                acts = actions.get(symbol, [])
-                rows = adjust([{k: _f(v) for k, v in r.items()} for r in group], acts or None)
-                if rows[-1]["trade_date"] != as_of:
-                    continue  # not traded on the latest day (suspended / delisted)
-                m = {"symbol": symbol, "as_of": as_of, **price_metrics(rows)}
-                f = funds.get(symbol, [])
-                m.update(fundamental_ratios(f[0] if f else None, f[1] if len(f) > 1 else None, m["close"]))
-                m["dividend_streak"] = None
-                if has_actions:
-                    # Trailing 12-month yield from actual payments: current, and covers every listed company.
-                    m["dividend_yield"] = ttm_dividend_yield(acts, as_of, m["close"])
-                    m["dividend_streak"] = paying_streak(acts, as_of)
-                s = shp.get(symbol)
-                m["promoter_pct"] = _f(s["promoter_pct"]) if s else None
-                m["promoter_change_1y"] = _f(s["promoter_change_1y"]) if s else None
-                out.append({k: _round(v) for k, v in m.items()})
+        for symbol, base in (_existing(conn) if skip_prices else _from_prices(conn, as_of, actions)):
+            acts = actions.get(symbol, [])
+            m = {"symbol": symbol, **base}
+            f = funds.get(symbol, [])
+            m.update(fundamental_ratios(f[0] if f else None, f[1] if len(f) > 1 else None, m["close"]))
+            m["dividend_streak"] = None
+            if has_actions:
+                # Trailing 12-month yield from actual payments: current, and covers every listed company.
+                m["dividend_yield"] = ttm_dividend_yield(acts, m["as_of"], m["close"])
+                m["dividend_streak"] = paying_streak(acts, m["as_of"])
+            s = shp.get(symbol)
+            m["promoter_pct"] = _f(s["promoter_pct"]) if s else None
+            m["promoter_change_1y"] = _f(s["promoter_change_1y"]) if s else None
+            out.append({k: _round(v) for k, v in m.items()})
 
         with conn.cursor() as cur:
             cur.executemany(UPSERT, out)
@@ -153,4 +181,6 @@ def run() -> int:
 
 
 if __name__ == "__main__":
-    run()
+    p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    p.add_argument("--skip-prices", action="store_true", help="keep price metrics; refresh fundamentals, dividends, holdings")
+    run(p.parse_args().skip_prices)

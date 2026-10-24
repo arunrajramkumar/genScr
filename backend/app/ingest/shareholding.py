@@ -135,9 +135,12 @@ def _holdings_for(nse: NseClient, q: dict) -> dict[str, float]:
 
 
 def load_symbol(nse: NseClient, conn, symbol: str, quarters: int = QUARTERS) -> int:
+    # Quarters already parsed keep their FII/DII/MF split: skips one XBRL download (plus NSE's delay) each.
+    parsed = {r["period_end"]: r for r in conn.execute(
+        "SELECT period_end, fii_pct, dii_pct, mf_pct FROM shareholding WHERE symbol = %s AND fii_pct IS NOT NULL", (symbol,))}
     rows = []
     for q in parse_master(nse.json(MASTER.format(symbol=symbol)))[:quarters]:
-        holdings = _holdings_for(nse, q) if q["xbrl"] else {}
+        holdings = parsed.get(q["period_end"]) or (_holdings_for(nse, q) if q["xbrl"] else {})
         rows.append({
             "symbol": symbol,
             "period_end": q["period_end"],

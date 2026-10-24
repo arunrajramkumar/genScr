@@ -1,5 +1,6 @@
 import json
 from contextlib import contextmanager
+from datetime import date
 
 import httpx
 
@@ -141,9 +142,13 @@ class _FakeNse:
 
 
 class _FakeConn:
-    def __init__(self):
+    def __init__(self, stored=()):
         self.upserted = []
         self.commits = 0
+        self.stored = list(stored)
+
+    def execute(self, sql, params=None):
+        return self.stored
 
     @contextmanager
     def cursor(self):
@@ -166,3 +171,18 @@ def test_load_symbol_maps_rows_and_keeps_master_numbers_when_xbrl_is_gone():
     assert (first["fii_pct"], first["dii_pct"], first["mf_pct"]) == (9.01, 13.57, 5.65)
     assert (second["fii_pct"], second["dii_pct"], second["mf_pct"]) == (None, None, None)
     assert second["promoter_pct"] == 71.77
+
+
+def test_load_symbol_reuses_quarters_already_parsed():
+    class CountingNse(_FakeNse):
+        downloads = 0
+
+        def text(self, url):
+            CountingNse.downloads += 1
+            return super().text(url)
+
+    stored = [{"period_end": date(2026, 9, 30), "fii_pct": 9.0, "dii_pct": 13.0, "mf_pct": 5.0}]
+    conn = _FakeConn(stored)
+    load_symbol(CountingNse(), conn, "TCS", quarters=2)
+    assert CountingNse.downloads == 1  # only the quarter not parsed yet
+    assert (conn.upserted[0]["fii_pct"], conn.upserted[0]["promoter_pct"]) == (9.0, 71.77)

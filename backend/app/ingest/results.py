@@ -94,11 +94,24 @@ def pick_filings(filings: list[dict], years: int, quarters: int) -> list[dict]:
     return [by_period[p] for p in periods if p in wanted]
 
 
-def load_symbol(nse: NseClient, conn, symbol: str, years: int, quarters: int) -> int:
+def not_loaded(filings: list[dict], have: dict[date, bool]) -> list[dict]:
+    """Filings whose period isn't stored yet, or is stored only from a standalone filing when a consolidated one exists.
+
+    have: {period_end: stored source is consolidated}. Saves most downloads (and NSE's request delay) on re-runs.
+    """
+    return [f for f in filings if f["period_end"] not in have or (f["consolidated"] and not have[f["period_end"]])]
+
+
+def load_symbol(nse: NseClient, conn, symbol: str, years: int, quarters: int, refresh: bool = False) -> int:
     row = conn.execute("SELECT face_value FROM stocks WHERE symbol = %s", (symbol,)).fetchone()
     face_value = float(row["face_value"]) if row and row["face_value"] else None
+    have = {} if refresh else {
+        r["period_end"]: r["consolidated"] for r in conn.execute(
+            "SELECT period_end, bool_or(source LIKE 'consolidated%%') AS consolidated FROM fundamentals "
+            "WHERE symbol = %s GROUP BY period_end", (symbol,))
+    }
     rows = []
-    for f in pick_filings(list_filings(nse, symbol), years, quarters):
+    for f in not_loaded(pick_filings(list_filings(nse, symbol), years, quarters), have):
         source = ("consolidated" if f["consolidated"] else "standalone") + " xbrl"
         try:
             xml = nse.text(f["xbrl"])
@@ -131,6 +144,7 @@ def main():
     p.add_argument("--years", type=int, default=3)
     p.add_argument("--quarters", type=int, default=4)
     p.add_argument("--skip-existing", action="store_true", help="Skip symbols that already have FY data")
+    p.add_argument("--refresh", action="store_true", help="Re-download filings already loaded (e.g. after a parser fix)")
     p.add_argument("--max-minutes", type=float, help="Stop cleanly after this long (rolling backfills resume next run)")
     a = p.parse_args()
 
@@ -149,7 +163,7 @@ def main():
                     print(f"time budget reached after {i - 1} of {len(symbols)} symbols; the rest load next run")
                     break
                 try:
-                    n = load_symbol(nse, conn, symbol, a.years, a.quarters)
+                    n = load_symbol(nse, conn, symbol, a.years, a.quarters, a.refresh)
                     ok += 1
                     streak = 0
                     print(f"[{i}/{len(symbols)}] {symbol}: {n} rows", flush=True)

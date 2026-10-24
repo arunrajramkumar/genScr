@@ -161,7 +161,12 @@ jobs:
 
       - name: Compute metrics
         working-directory: backend
-        run: python -u -m app.ingest.compute_metrics
+        run: |
+          # Price metrics need ~5 years of prices (minutes on the free database); results/holdings runs keep them.
+          case "$TASK" in
+            fundamentals|fundamentals-backfill|shareholding-history) python -u -m app.ingest.compute_metrics --skip-prices ;;
+            *) python -u -m app.ingest.compute_metrics ;;
+          esac
 
       - name: Summary
         if: always()
