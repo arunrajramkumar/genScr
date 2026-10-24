@@ -36,13 +36,33 @@ def run_screen(req: ScreenRequest, conn=Depends(get_conn)):
     except ValueError as e:
         raise HTTPException(400, str(e)) from e
     rows = conn.execute(sql, params).fetchall()
-    return {"filters": filters, "count": len(rows), "results": rows}
+    total = rows[0]["total_matches"] if rows else 0
+    for r in rows:
+        r.pop("total_matches", None)
+    universe = conn.execute("SELECT count(*) AS n FROM stock_metrics").fetchone()["n"]
+    return {"filters": filters, "count": len(rows), "total": total, "universe": universe, "results": rows}
+
+
+@router.get("/stats")
+@cached(maxsize=4, max_age=3600)
+def stats(conn=Depends(get_conn)):
+    """Market distribution per field (percentiles + histogram) for the filter builder."""
+    cols = list(screener.FIELDS)
+    select = ", ".join("m." + c for c in cols)
+    rows = conn.execute(f"SELECT s.sector, {select} FROM stock_metrics m JOIN stocks s USING (symbol)").fetchall()
+    out = {}
+    for c in cols:
+        out[c] = screener.distribution([r[c] for r in rows if r[c] is not None])
+    sectors = sorted({r["sector"] for r in rows if r["sector"]})
+    return {"fields": out, "sectors": sectors, "universe": len(rows)}
 
 
 @router.get("/fields")
 @cached(ttl=86400, maxsize=1, max_age=86400)
 def fields():
-    return screener.FIELDS
+    return {k: {**v, "description": screener.DESCRIPTIONS.get(k, ""),
+                "group": next((g for g, fs in screener.GROUPS.items() if k in fs), "Other")}
+            for k, v in screener.FIELDS.items()}
 
 
 @router.get("/presets")

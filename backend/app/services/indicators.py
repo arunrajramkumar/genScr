@@ -25,6 +25,26 @@ def rsi(closes: list[float], n: int = 14) -> float | None:
     return 100 - 100 / (1 + rs)
 
 
+def cagr(closes: list[float], years: int, per_year: int = 248) -> float | None:
+    """Annualised growth over `years` (trading-day lookback)."""
+    n = years * per_year
+    if len(closes) <= n or not closes[-1 - n]:
+        return None
+    return ((closes[-1] / closes[-1 - n]) ** (1 / years) - 1) * 100
+
+
+def volatility(closes: list[float], window: int = 252) -> float | None:
+    """Annualised standard deviation of daily log returns, in %."""
+    import math
+
+    pts = closes[-window - 1:]
+    rets = [math.log(b / a) for a, b in pairwise(pts) if a and b]
+    if len(rets) < 60:
+        return None
+    mean = sum(rets) / len(rets)
+    return math.sqrt(sum((r - mean) ** 2 for r in rets) / (len(rets) - 1) * 252) * 100
+
+
 def pct_return(closes: list[float], lookback: int) -> float | None:
     if len(closes) <= lookback:
         return None

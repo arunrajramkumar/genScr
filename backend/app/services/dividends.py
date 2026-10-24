@@ -27,6 +27,16 @@ def share_factor_after(d: date, actions: list[dict]) -> float:
     return f
 
 
+def paying_streak(actions: list[dict], today: date) -> int:
+    """Consecutive completed financial years (up to last year) with at least one dividend."""
+    years = {fy_of(a["ex_date"]) for a in actions if a["kind"] == "dividend" and a.get("amount")}
+    streak, fy = 0, fy_of(today) - 1
+    while fy in years:
+        streak += 1
+        fy -= 1
+    return streak
+
+
 def ttm_dividend_yield(actions: list[dict], as_of: date, close: float | None) -> float | None:
     """Dividends ex-dated in the 12 months to `as_of`, in today's share terms, as % of `close`."""
     if not close:

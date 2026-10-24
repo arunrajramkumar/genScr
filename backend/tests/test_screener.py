@@ -34,3 +34,32 @@ def test_build_sql_rejects_unknown_sort_and_op():
 def test_presets_parse():
     for p in PRESETS:
         assert parse_query(p["query"])
+
+
+def test_build_sql_includes_total_match_count():
+    sql, _ = build_sql([{"field": "roe", "op": ">", "value": 10}])
+    assert "count(*) OVER () AS total_matches" in sql
+
+
+def test_new_fields_and_aliases():
+    assert parse_query("streak >= 10 and vol < 30 and cagr5 > 15") == [
+        {"field": "dividend_streak", "op": ">=", "value": 10.0},
+        {"field": "volatility_1y", "op": "<", "value": 30.0},
+        {"field": "cagr_5y", "op": ">", "value": 15.0},
+    ]
+
+
+def test_distribution_percentiles_and_histogram():
+    from app.services.screener import distribution
+
+    d = distribution(list(range(1, 101)))
+    assert d["count"] == 100 and d["p50"] == pytest.approx(50.5)
+    assert sum(d["hist"]) == pytest.approx(97, abs=2)  # 2nd..98th percentile window
+    assert distribution([]) == {"count": 0}
+
+
+def test_every_field_has_description_and_group():
+    from app.services.screener import DESCRIPTIONS, FIELDS, GROUPS
+
+    grouped = {f for fs in GROUPS.values() for f in fs}
+    assert set(FIELDS) == set(DESCRIPTIONS) == grouped

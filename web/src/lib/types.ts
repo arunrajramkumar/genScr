@@ -26,6 +26,10 @@ export interface Metrics {
   piotroski_f: Num;
   altman_z: Num;
   dividend_yield: Num;
+  cagr_3y?: Num;
+  cagr_5y?: Num;
+  volatility_1y?: Num;
+  dividend_streak?: Num;
 }
 
 export interface Stock extends Partial<Metrics> {

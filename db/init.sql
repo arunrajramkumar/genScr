@@ -125,3 +125,7 @@ CREATE INDEX IF NOT EXISTS corporate_actions_date_idx ON corporate_actions (ex_d
 -- Migrations for databases created before these columns existed (safe to re-run).
 ALTER TABLE fundamentals  ADD COLUMN IF NOT EXISTS dividends_paid NUMERIC(18, 2);
 ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS dividend_yield NUMERIC(8, 2);
+ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS cagr_3y NUMERIC(10, 2);
+ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS cagr_5y NUMERIC(10, 2);
+ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS volatility_1y NUMERIC(8, 2);
+ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS dividend_streak SMALLINT;

@@ -9,8 +9,8 @@ from itertools import groupby
 
 from app.db import connect
 from app.services.adjust import adjust
-from app.services.dividends import ttm_dividend_yield
-from app.services.indicators import pct_return, rsi, sma
+from app.services.dividends import paying_streak, ttm_dividend_yield
+from app.services.indicators import cagr, pct_return, rsi, sma, volatility
 from app.services.scores import fundamental_ratios
 
 COLUMNS = [
@@ -18,6 +18,7 @@ COLUMNS = [
     "return_1m", "return_1y", "avg_volume_20d", "turnover", "rsi_14", "sma_50", "sma_200",
     "market_cap", "pe", "pb", "roe", "roce", "debt_to_equity", "net_margin",
     "revenue_growth_yoy", "profit_growth_yoy", "piotroski_f", "altman_z", "dividend_yield",
+    "cagr_3y", "cagr_5y", "volatility_1y", "dividend_streak",
 ]
 
 UPSERT = f"""
@@ -59,6 +60,9 @@ def price_metrics(rows: list[dict]) -> dict:
         "rsi_14": rsi(closes, 14),
         "sma_50": sma(closes, 50),
         "sma_200": sma(closes, 200),
+        "cagr_3y": cagr(closes, 3),
+        "cagr_5y": cagr(closes, 5),
+        "volatility_1y": volatility(closes),
     }
 
 
@@ -88,28 +92,32 @@ def run() -> int:
                 actions[r["symbol"]].append({k: _f(v) for k, v in r.items()})
             has_actions = bool(actions)
 
-        prices = conn.execute(
-            """
-            SELECT symbol, trade_date, close, prev_close, high, low, volume, turnover
-            FROM prices WHERE trade_date > %s::date - 400
-            ORDER BY symbol, trade_date
-            """,
-            (as_of,),
-        ).fetchall()
-
+        # Stream ~5 years of prices one symbol at a time (a server-side cursor keeps memory flat).
         out = []
-        for symbol, group in groupby(prices, key=lambda r: r["symbol"]):
-            acts = actions.get(symbol, [])
-            rows = adjust([{k: _f(v) for k, v in r.items()} for r in group], acts or None)
-            if rows[-1]["trade_date"] != as_of:
-                continue  # not traded on the latest day (suspended / delisted)
-            m = {"symbol": symbol, "as_of": as_of, **price_metrics(rows)}
-            f = funds.get(symbol, [])
-            m.update(fundamental_ratios(f[0] if f else None, f[1] if len(f) > 1 else None, m["close"]))
-            if has_actions:
-                # Trailing 12-month yield from actual payments: current, and covers every listed company.
-                m["dividend_yield"] = ttm_dividend_yield(acts, as_of, m["close"])
-            out.append({k: _round(v) for k, v in m.items()})
+        with conn.cursor(name="metrics_prices") as stream:
+            stream.itersize = 20_000
+            stream.execute(
+                """
+                SELECT symbol, trade_date, close, prev_close, high, low, volume, turnover
+                FROM prices WHERE trade_date > %s::date - 1900
+                ORDER BY symbol, trade_date
+                """,
+                (as_of,),
+            )
+            for symbol, group in groupby(stream, key=lambda r: r["symbol"]):
+                acts = actions.get(symbol, [])
+                rows = adjust([{k: _f(v) for k, v in r.items()} for r in group], acts or None)
+                if rows[-1]["trade_date"] != as_of:
+                    continue  # not traded on the latest day (suspended / delisted)
+                m = {"symbol": symbol, "as_of": as_of, **price_metrics(rows)}
+                f = funds.get(symbol, [])
+                m.update(fundamental_ratios(f[0] if f else None, f[1] if len(f) > 1 else None, m["close"]))
+                m["dividend_streak"] = None
+                if has_actions:
+                    # Trailing 12-month yield from actual payments: current, and covers every listed company.
+                    m["dividend_yield"] = ttm_dividend_yield(acts, as_of, m["close"])
+                    m["dividend_streak"] = paying_streak(acts, as_of)
+                out.append({k: _round(v) for k, v in m.items()})
 
         with conn.cursor() as cur:
             cur.executemany(UPSERT, out)

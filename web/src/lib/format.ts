@@ -53,5 +53,6 @@ export function fmtField(v: Num | undefined, unit: string): string {
   if (unit === "%") return fmtPct(v);
   if (unit === "/9") return toNum(v) === null ? "—" : `${toNum(v)}/9`;
   if (unit === "x") return toNum(v) === null ? "—" : `${fmtNum(v)}x`;
+  if (unit === "yrs") return toNum(v) === null ? "—" : `${toNum(v)} yrs`;
   return fmtNum(v, unit === "" ? 2 : 0);
 }

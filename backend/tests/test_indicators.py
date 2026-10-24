@@ -19,3 +19,14 @@ def test_rsi_bounds():
 def test_pct_return():
     assert pct_return([100, 110, 121], 2) == pytest.approx(21.0)
     assert pct_return([100], 1) is None
+
+
+def test_cagr_and_volatility():
+    from app.services.indicators import cagr, volatility
+
+    closes = [100 * (1.1 ** (i / 248)) for i in range(3 * 248 + 1)]  # 10% a year
+    assert cagr(closes, 3) == pytest.approx(10.0, abs=0.01)
+    assert cagr(closes, 5) is None
+    flat = [100.0] * 300
+    assert volatility(flat) == 0
+    assert volatility([100.0] * 30) is None

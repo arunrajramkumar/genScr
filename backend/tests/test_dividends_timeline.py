@@ -100,3 +100,11 @@ def test_recorded_actions_replace_gap_heuristic():
     # With actions supplied (even unrelated), a gap that isn't a recorded action is a real price move.
     other = [{"ex_date": date(2020, 1, 2), "kind": "dividend", "amount": 1}]
     assert adjust(rows, other)[0]["close"] == pytest.approx(100.0)
+
+
+def test_paying_streak():
+    from app.services.dividends import paying_streak
+
+    acts = [{"ex_date": date(y, 7, 1), "kind": "dividend", "amount": 1} for y in (2019, 2020, 2022, 2023, 2024, 2025)]
+    assert paying_streak(acts, date(2026, 10, 1)) == 4  # FY23..FY26 complete (FY27 in progress); FY22 missing
+    assert paying_streak([], date(2026, 10, 1)) == 0
