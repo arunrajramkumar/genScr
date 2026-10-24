@@ -1,0 +1,62 @@
+name: Database maintenance
+
+# Manual. report: read-only sizes per table/index, dead rows, price history range.
+#         vacuum: VACUUM (ANALYZE) every table so space left by updated/deleted rows is reused (no extra disk needed,
+#                 nothing deleted). It doesn't shrink files on disk, but stops the database growing.
+
+on:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: What to run
+        type: choice
+        options: [report, vacuum]
+        default: report
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-db # never overlaps a data update or migration
+  cancel-in-progress: false
+
+jobs:
+  maintain:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Connect
+        env:
+          DB_URL: ${{ secrets.RENDER_DATABASE_URL }}
+        run: |
+          [ -n "$DB_URL" ] || { echo "::error::Secret RENDER_DATABASE_URL is not set"; exit 1; }
+          case "$DB_URL" in *sslmode=*) U="$DB_URL" ;; *\?*) U="$DB_URL&sslmode=require" ;; *) U="$DB_URL?sslmode=require" ;; esac
+          echo "::add-mask::$U"
+          echo "DATABASE_URL=$U" >> "$GITHUB_ENV"
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Vacuum
+        if: inputs.task == 'vacuum'
+        run: psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c "VACUUM (ANALYZE, VERBOSE) prices" -c "VACUUM (ANALYZE)"
+
+      - name: Report
+        if: always()
+        run: |
+          q() { psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -qAt -F ' | ' -c "$1"; }
+          {
+            echo "### Database size: $(q "SELECT pg_size_pretty(pg_database_size(current_database()))")"
+            echo
+            echo '| Table | Total | Table | Indexes | Live rows | Dead rows |'
+            echo '|---|---:|---:|---:|---:|---:|'
+            q "SELECT '| ' || relname, pg_size_pretty(pg_total_relation_size(relid)), pg_size_pretty(pg_relation_size(relid)),
+                      pg_size_pretty(pg_indexes_size(relid)), n_live_tup, n_dead_tup || ' |'
+               FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC"
+            echo
+            echo '| Index | Size |'
+            echo '|---|---:|'
+            q "SELECT '| ' || indexrelname, pg_size_pretty(pg_relation_size(indexrelid)) || ' |'
+               FROM pg_stat_user_indexes ORDER BY pg_relation_size(indexrelid) DESC LIMIT 12"
+            echo
+            echo "- Prices: $(q "SELECT count(*) || ' rows, ' || min(trade_date) || ' to ' || max(trade_date) FROM prices")"
+            echo "- Rows per year: $(q "SELECT string_agg(y || ': ' || n, ', ' ORDER BY y) FROM (SELECT extract(year FROM trade_date)::int AS y, count(*) AS n FROM prices GROUP BY 1) t")"
+          } | tee -a "$GITHUB_STEP_SUMMARY"
