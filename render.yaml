@@ -29,8 +29,10 @@ services:
     buildFilter:
       paths: ["backend/**"]
     envVars:
+      # Set by hand to the Neon connection string (Neon direct URL, read-only role recommended; see docs/ROADMAP.md).
+      # Not linked to the Render database, so a Blueprint sync can't switch the API back to it.
       - key: DATABASE_URL
-        fromDatabase: { name: genscr-db, property: connectionString }
+        sync: false
       - key: CORS_ORIGINS # e.g. https://genscr-site.onrender.com (later your domain)
         sync: false
 
