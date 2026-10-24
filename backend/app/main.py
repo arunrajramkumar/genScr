@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse
 from app.config import settings
 from app.db import pool
 from app.middleware import RateLimiter, make_guard_middleware
-from app.routers import calendar, compare, indices, market, screener, search, stocks, watchlist
+from app.routers import calendar, compare, delivery, indices, market, screener, search, shareholding, stocks, valuation, watchlist
 
 
 @asynccontextmanager
@@ -31,7 +31,8 @@ app.add_middleware(
 )
 
 # watchlist first: its /stocks/batch must not be captured by stocks' /stocks/{symbol}.
-for module in (watchlist, search, stocks, screener, compare, market, indices, calendar):
+# delivery and shareholding before stocks, so /stocks/{symbol}/delivery and /shareholding are registered ahead of the stocks routes.
+for module in (watchlist, delivery, shareholding, valuation, search, stocks, screener, compare, market, indices, calendar):
     app.include_router(module.router, prefix="/api")
 
 

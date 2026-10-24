@@ -30,6 +30,8 @@ export interface Metrics {
   cagr_5y?: Num;
   volatility_1y?: Num;
   dividend_streak?: Num;
+  promoter_pct?: Num;
+  promoter_change_1y?: Num;
 }
 
 export interface Stock extends Partial<Metrics> {
@@ -242,4 +244,32 @@ export interface IndexDetail {
   risk: RiskResponse | null;
   constituents: Stock[];
   sector_mix: [string, number][];
+}
+
+// One filed quarter from GET /stocks/{symbol}/shareholding (oldest first). Percentages of total shares.
+export interface ShareholdingQuarter {
+  period_end: string;
+  promoter_pct: number | null;
+  public_pct: number | null;
+  fii_pct: number | null;
+  dii_pct: number | null;
+  mf_pct: number | null;
+  pledged_pct: number | null;
+}
+
+// Board meetings and results dates (GET /calendar/events). Dates are as announced by companies.
+export type EventCategory = "results" | "dividend" | "fund_raising" | "other";
+
+export interface CompanyEvent {
+  symbol: string;
+  name: string | null;
+  event_date: string;
+  category: EventCategory;
+  description: string | null;
+}
+
+export interface EventsResponse {
+  as_of: string | null;
+  upcoming: CompanyEvent[];
+  recent: CompanyEvent[];
 }

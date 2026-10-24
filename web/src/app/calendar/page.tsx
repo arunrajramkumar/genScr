@@ -3,11 +3,12 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { CalendarDays } from "lucide-react";
+import { CalendarClock, CalendarDays } from "lucide-react";
 import { SectionNote, StaleDataBanner } from "@/components/Legal";
-import { ErrorNote, PageLoading } from "@/components/ui";
+import { ErrorNote, Loading, PageLoading } from "@/components/ui";
 import { api } from "@/lib/api";
 import { fmtPrice, toNum } from "@/lib/format";
+import type { EventCategory, EventsResponse } from "@/lib/types";
 
 type Kind = "dividend" | "bonus" | "split" | "rights" | "buyback" | "demerger";
 
@@ -73,11 +74,132 @@ const pctOf = (a: Action) => {
   return pct === null ? null : pct.toFixed(2);
 };
 
-/** Groups rows under one heading per ex-date, keeping the API's order. */
-function byDate(rows: Action[]): [string, Action[]][] {
-  const groups = new Map<string, Action[]>();
-  rows.forEach((r) => groups.set(r.ex_date, [...(groups.get(r.ex_date) ?? []), r]));
+/** Groups rows under one heading per date, keeping the API's order. */
+function byDate<T>(rows: T[], day: (r: T) => string): [string, T[]][] {
+  const groups = new Map<string, T[]>();
+  rows.forEach((r) => groups.set(day(r), [...(groups.get(day(r)) ?? []), r]));
   return [...groups.entries()];
+}
+
+// Filter chips for board meetings. Values are the API's category names.
+const EVENT_FILTERS: { label: string; value: EventCategory }[] = [
+  { label: "Financial results", value: "results" },
+  { label: "Dividend", value: "dividend" },
+  { label: "Fund raising", value: "fund_raising" },
+  { label: "Other", value: "other" },
+];
+
+const EVENT_TEXT: Record<EventCategory, string> = {
+  results: "Financial results",
+  dividend: "Dividend",
+  fund_raising: "Fund raising",
+  other: "Other business",
+};
+
+/** Board meetings announced to NSE, grouped by date. Own filter and fetch, separate from the actions list. */
+function MeetingsSection() {
+  const [data, setData] = useState<EventsResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [active, setActive] = useState<EventCategory[]>([]); // none selected = every purpose
+
+  useEffect(() => {
+    let current = true;
+    const qs = active.length ? `?category=${active.join(",")}` : "";
+    setError(null);
+    api<EventsResponse>(`/calendar/events${qs}`)
+      .then((d) => current && setData(d))
+      .catch((e) => current && setError(e.message));
+    return () => {
+      current = false;
+    };
+  }, [active]);
+
+  const toggle = (value: EventCategory) =>
+    setActive((s) => (s.includes(value) ? s.filter((x) => x !== value) : [...s, value]));
+
+  const sections: [string, EventsResponse["upcoming"], string][] = data
+    ? [
+        ["Upcoming", data.upcoming, "Meeting date on or after the latest data date."],
+        ["Recent", data.recent, "Meeting date before the latest data date, newest first."],
+      ]
+    : [];
+
+  return (
+    <section className="space-y-4 border-t border-line pt-6">
+      <div>
+        <h2 className="flex items-center gap-2 text-xl font-bold text-white">
+          <CalendarClock className="h-5 w-5 text-accent" /> Board meetings &amp; results
+        </h2>
+        <p className="mt-1 text-sm text-muted">
+          Dates on which companies have announced a board meeting to consider financial results, dividends, fund
+          raising or other business.
+        </p>
+      </div>
+
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Filter by meeting purpose">
+        {EVENT_FILTERS.map((f) => {
+          const on = active.includes(f.value);
+          return (
+            <button
+              key={f.value}
+              onClick={() => toggle(f.value)}
+              aria-pressed={on}
+              className={clsx("chip", on && "border-accent/60 bg-accent/10 text-white")}
+            >
+              {f.label}
+            </button>
+          );
+        })}
+      </div>
+
+      {error ? (
+        <ErrorNote message={error} />
+      ) : !data ? (
+        <Loading label="Loading board meetings…" />
+      ) : (
+        sections.map(([title, rows, hint]) => (
+          <section key={title} className="panel overflow-hidden">
+            <h3 className="border-b border-line px-4 py-3 text-sm font-semibold text-white">
+              {title} <span className="font-normal text-muted">({rows.length})</span>
+              <span className="ml-2 text-xs font-normal text-muted">{hint}</span>
+            </h3>
+            {rows.length === 0 ? (
+              <p className="px-4 py-6 text-sm text-muted">No board meetings in this window for the selected purposes.</p>
+            ) : (
+              byDate(rows, (e) => e.event_date).map(([day, items]) => (
+                <div key={day}>
+                  <h4 className="bg-white/[0.02] px-4 py-2 text-xs font-medium text-slate-300">{fmtDay(day)}</h4>
+                  <ul>
+                    {items.map((e, i) => (
+                      <li
+                        key={`${e.symbol}-${e.category}-${i}`}
+                        className="border-b border-line/60 px-4 py-2 text-sm transition hover:bg-white/[0.03]"
+                      >
+                        <div className="grid grid-cols-[6.5rem_minmax(0,1fr)] items-baseline gap-x-4 md:grid-cols-[8rem_minmax(0,1fr)_12rem]">
+                          <Link href={`/stock/${e.symbol}`} className="truncate font-medium text-white hover:text-accent">
+                            {e.symbol}
+                          </Link>
+                          <span className="truncate text-slate-400">{e.name ?? e.symbol}</span>
+                          <span className="text-slate-200 md:text-right">{EVENT_TEXT[e.category]}</span>
+                        </div>
+                        {e.description && <p className="mt-0.5 line-clamp-2 text-xs text-muted">{e.description}</p>}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))
+            )}
+          </section>
+        ))
+      )}
+
+      <SectionNote>
+        Source: NSE event calendar. Board meeting dates and agendas are as announced by the companies and can change
+        or be rescheduled; meetings NSE shows as cancelled are left out. Please confirm on nseindia.com before relying
+        on a date. This lists announced dates only and is not a forecast of results or payouts.
+      </SectionNote>
+    </section>
+  );
 }
 
 export default function CalendarPage() {
@@ -150,7 +272,7 @@ export default function CalendarPage() {
           {rows.length === 0 ? (
             <p className="px-4 py-6 text-sm text-muted">No actions in this window for the selected types.</p>
           ) : (
-            byDate(rows).map(([day, items]) => (
+            byDate(rows, (a) => a.ex_date).map(([day, items]) => (
               <div key={day}>
                 <h3 className="bg-white/[0.02] px-4 py-2 text-xs font-medium text-slate-300">{fmtDay(day)}</h3>
                 <ul>
@@ -171,6 +293,8 @@ export default function CalendarPage() {
           )}
         </section>
       ))}
+
+      <MeetingsSection />
 
       <SectionNote>
         Source: NSE corporate announcements, as published by NSE. This is a factual list of announced actions and is

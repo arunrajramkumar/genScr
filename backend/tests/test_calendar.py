@@ -6,7 +6,7 @@ from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from app.main import app
-from app.routers.calendar import get_calendar, parse_kinds
+from app.routers.calendar import get_calendar, get_events, parse_categories, parse_kinds
 
 client = TestClient(app)  # no context manager: lifespan (DB pool) is not started
 
@@ -99,3 +99,68 @@ def test_empty_stock_metrics_gives_an_empty_calendar():
     # No latest date: the anchor row has no action attached.
     conn = FakeConn([_row(None, None, kind=None, as_of=None)])
     assert _calendar(conn) == {"as_of": None, "upcoming": [], "recent": []}
+
+
+def _event(symbol, event_date, category="results", **extra):
+    base = {"as_of": ANCHOR, "symbol": symbol, "name": f"{symbol} Ltd", "event_date": event_date,
+            "category": category, "description": "To consider and approve the financial results"}
+    base.update(extra)
+    return base
+
+
+def _events(conn, **kw):
+    args = {"symbol": None, "category": None, "days_back": 30, "days_ahead": 90}
+    args.update(kw)
+    return get_events.__wrapped__(conn=conn, **args)
+
+
+def test_events_route_is_registered():
+    assert "/api/calendar/events" in client.get("/openapi.json").json()["paths"]
+
+
+def test_parse_categories():
+    assert parse_categories(None) is None and parse_categories(" ") is None
+    assert parse_categories("results, Fund_Raising,results") == ["results", "fund_raising"]
+    with pytest.raises(HTTPException) as err:
+        parse_categories("results,nope")
+    assert err.value.status_code == 400
+
+
+def test_events_upcoming_sorted_first_then_recent_newest_first():
+    rows = [
+        _event("OLD1", date(2026, 10, 1)),
+        _event("NEW2", date(2026, 11, 1)),
+        _event("TODAY", ANCHOR, "dividend"),
+        _event("RECENT", date(2026, 10, 20)),
+        _event("NEW1", date(2026, 10, 25)),
+        _event("NEW1", date(2026, 10, 25), "dividend"),
+    ]
+    conn = FakeConn(rows)
+    out = _events(conn)
+    assert conn.calls == 1
+    assert out["as_of"] == ANCHOR
+    assert [(r["symbol"], r["category"]) for r in out["upcoming"]] == [
+        ("TODAY", "dividend"), ("NEW1", "dividend"), ("NEW1", "results"), ("NEW2", "results")]
+    assert [r["symbol"] for r in out["recent"]] == ["RECENT", "OLD1"]
+    assert all("as_of" not in r for r in out["upcoming"] + out["recent"])
+
+
+def test_events_params_are_passed_to_the_query():
+    conn = FakeConn([])
+    _events(conn, symbol=" tcs ", category="results,dividend", days_back=0, days_ahead=14)
+    assert conn.params == {"back": 0, "ahead": 14, "categories": ["results", "dividend"], "symbol": "TCS"}
+    conn = FakeConn([])
+    _events(conn)
+    assert conn.params["categories"] is None and conn.params["symbol"] is None
+
+
+def test_events_missing_table_gives_an_empty_result():
+    conn = FakeConn(error=psycopg.errors.UndefinedTable("relation events does not exist"))
+    assert _events(conn) == {"as_of": None, "upcoming": [], "recent": []}
+    assert conn.rolled_back
+
+
+def test_events_empty_stock_metrics_gives_an_empty_result():
+    conn = FakeConn([{"as_of": None, "symbol": None, "name": None, "event_date": None, "category": None,
+                      "description": None}])
+    assert _events(conn) == {"as_of": None, "upcoming": [], "recent": []}

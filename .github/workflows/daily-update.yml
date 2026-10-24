@@ -10,12 +10,13 @@ on:
     - cron: "30 16 * * 1-5" # 22:00 IST retry in case NSE published late (already-loaded days are skipped)
     - cron: "30 3 * * 0" # 09:00 IST Sunday: stock list + sectors
     - cron: "30 20 1 * *" # 02:00 IST on the 2nd: latest results filings
+    - cron: "30 20 * * 5" # 02:00 IST Saturday: extend results coverage beyond the Nifty 500, a slice per run
   workflow_dispatch:
     inputs:
       task:
         description: What to update
         type: choice
-        options: [prices, stocks, fundamentals, corporate-actions-history, repair-history, all]
+        options: [prices, stocks, fundamentals, fundamentals-backfill, shareholding-history, corporate-actions-history, repair-history, all]
         default: prices
 
 permissions:
@@ -39,6 +40,7 @@ jobs:
           case "$SCHEDULE" in
             "30 3 * * 0")  task=stocks ;;
             "30 20 1 * *") task=fundamentals ;;
+            "30 20 * * 5") task=fundamentals-backfill ;;
             "")            task="${INPUT_TASK:-prices}" ;;
             *)             task=prices ;;
           esac
@@ -85,6 +87,12 @@ jobs:
         working-directory: backend
         run: python -u -m app.ingest.bhavcopy --lookback 10
 
+      - name: Delivery % (last 5 days)
+        if: env.TASK == 'prices' || env.TASK == 'all'
+        continue-on-error: true # NSE may refuse cloud IPs or publish late; prices and metrics still update
+        working-directory: backend
+        run: python -u -m app.ingest.delivery --lookback 5
+
       - name: Index closes (last 10 days)
         if: env.TASK == 'prices' || env.TASK == 'all'
         continue-on-error: true
@@ -102,6 +110,12 @@ jobs:
         continue-on-error: true # NSE may refuse cloud IPs; prices and metrics still update
         working-directory: backend
         run: python -u -m app.ingest.corporate_actions
+
+      - name: Board meetings and results dates (30 days back to 90 ahead)
+        if: env.TASK == 'prices' || env.TASK == 'all'
+        continue-on-error: true # NSE may refuse cloud IPs; prices and metrics still update
+        working-directory: backend
+        run: python -u -m app.ingest.events
 
       - name: Corporate actions history since 2005 (one-off, ~10 min)
         if: env.TASK == 'corporate-actions-history' || env.TASK == 'repair-history'
@@ -122,6 +136,27 @@ jobs:
         timeout-minutes: 200
         working-directory: backend
         run: python -u -m app.ingest.results --universe nifty500 --years 1 --quarters 2
+
+      - name: Results filings for companies not yet covered (rolling, ~3h per run)
+        if: env.TASK == 'fundamentals-backfill'
+        continue-on-error: true
+        timeout-minutes: 200
+        working-directory: backend
+        run: python -u -m app.ingest.results --universe all --skip-existing --years 1 --quarters 4 --max-minutes 180
+
+      - name: Shareholding patterns (latest 2 quarters, ~40 min)
+        if: env.TASK == 'fundamentals' || env.TASK == 'all'
+        continue-on-error: true # NSE may refuse cloud IPs; metrics still run
+        timeout-minutes: 90
+        working-directory: backend
+        run: python -u -m app.ingest.shareholding --quarters 2
+
+      - name: Shareholding patterns, 12 quarters (one-off, ~2h)
+        if: env.TASK == 'shareholding-history'
+        continue-on-error: true
+        timeout-minutes: 200
+        working-directory: backend
+        run: python -u -m app.ingest.shareholding --quarters 12
 
       - name: Compute metrics
         working-directory: backend

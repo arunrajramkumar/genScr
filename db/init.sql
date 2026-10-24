@@ -156,6 +156,31 @@ CREATE TABLE IF NOT EXISTS symbol_changes (
     PRIMARY KEY (old_symbol, new_symbol, effective_date)
 );
 
+-- Board meetings and results dates from NSE's event calendar. purpose is a normalised category
+-- (results / dividend / fund_raising / other); description is the company's stated agenda.
+CREATE TABLE IF NOT EXISTS events (
+    symbol       TEXT NOT NULL,
+    event_date   DATE NOT NULL,
+    purpose      TEXT NOT NULL,
+    description  TEXT,
+    PRIMARY KEY (symbol, event_date, purpose)
+);
+CREATE INDEX IF NOT EXISTS events_date_idx ON events (event_date);
+
+-- Shareholding pattern per quarter end (NSE shareholding filings), % of total shares.
+-- fii/dii are institutions (FII = foreign institutional investors); mf is mutual funds/UTI, part of dii.
+CREATE TABLE IF NOT EXISTS shareholding (
+    symbol        TEXT NOT NULL,
+    period_end    DATE NOT NULL,
+    promoter_pct  NUMERIC(6, 2),
+    public_pct    NUMERIC(6, 2),
+    fii_pct       NUMERIC(6, 2),
+    dii_pct       NUMERIC(6, 2),
+    mf_pct        NUMERIC(6, 2),
+    pledged_pct   NUMERIC(6, 2),
+    PRIMARY KEY (symbol, period_end)
+);
+
 -- Migrations for databases created before these columns existed (safe to re-run).
 ALTER TABLE fundamentals  ADD COLUMN IF NOT EXISTS dividends_paid NUMERIC(18, 2);
 ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS dividend_yield NUMERIC(8, 2);
@@ -163,3 +188,11 @@ ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS cagr_3y NUMERIC(10, 2);
 ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS cagr_5y NUMERIC(10, 2);
 ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS volatility_1y NUMERIC(8, 2);
 ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS dividend_streak SMALLINT;
+-- Delivery: share of traded quantity taken for delivery (NSE sec_bhavdata_full, EQ/BE series).
+ALTER TABLE prices        ADD COLUMN IF NOT EXISTS deliv_qty BIGINT;
+ALTER TABLE prices        ADD COLUMN IF NOT EXISTS deliv_pct NUMERIC(6, 2);
+ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS deliv_pct NUMERIC(6, 2);
+ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS deliv_pct_avg_20d NUMERIC(6, 2);
+-- Shareholding: promoter % now, and the change in points vs the same quarter a year earlier.
+ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS promoter_pct NUMERIC(6, 2);
+ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS promoter_change_1y NUMERIC(6, 2);

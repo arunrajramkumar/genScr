@@ -131,6 +131,7 @@ def main():
     p.add_argument("--years", type=int, default=3)
     p.add_argument("--quarters", type=int, default=4)
     p.add_argument("--skip-existing", action="store_true", help="Skip symbols that already have FY data")
+    p.add_argument("--max-minutes", type=float, help="Stop cleanly after this long (rolling backfills resume next run)")
     a = p.parse_args()
 
     with connect() as conn:
@@ -141,8 +142,12 @@ def main():
 
         nse = NseClient()
         ok = failed = streak = 0
+        deadline = time.monotonic() + a.max_minutes * 60 if a.max_minutes else None
         try:
             for i, symbol in enumerate(symbols, 1):
+                if deadline and time.monotonic() > deadline:
+                    print(f"time budget reached after {i - 1} of {len(symbols)} symbols; the rest load next run")
+                    break
                 try:
                     n = load_symbol(nse, conn, symbol, a.years, a.quarters)
                     ok += 1

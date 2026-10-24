@@ -31,6 +31,10 @@ FIELDS: dict[str, dict] = {
     "cagr_5y": {"label": "5Y Price CAGR", "unit": "%", "higher_is_better": True},
     "volatility_1y": {"label": "Volatility (1Y)", "unit": "%", "higher_is_better": False},
     "dividend_streak": {"label": "Dividend Streak", "unit": "yrs", "higher_is_better": True},
+    "deliv_pct": {"label": "Delivery %", "unit": "%", "higher_is_better": None},
+    "deliv_pct_avg_20d": {"label": "Delivery % (20D avg)", "unit": "%", "higher_is_better": None},
+    "promoter_pct": {"label": "Promoter Holding", "unit": "%", "higher_is_better": None},
+    "promoter_change_1y": {"label": "Promoter Holding Change (1Y)", "unit": "pts", "higher_is_better": None},
 }
 
 GROUPS = {
@@ -40,7 +44,8 @@ GROUPS = {
     "Returns": ["return_1m", "return_1y", "cagr_3y", "cagr_5y", "change_pct"],
     "Risk & technicals": ["volatility_1y", "pct_from_52w_high", "rsi_14"],
     "Income": ["dividend_streak"],
-    "Trading": ["close", "turnover", "avg_volume_20d"],
+    "Trading": ["close", "turnover", "avg_volume_20d", "deliv_pct", "deliv_pct_avg_20d"],
+    "Ownership": ["promoter_pct", "promoter_change_1y"],
 }
 
 DESCRIPTIONS = {
@@ -68,6 +73,10 @@ DESCRIPTIONS = {
     "cagr_5y": "Annualised price growth over 5 years (split/bonus-adjusted)",
     "volatility_1y": "Annualised day-to-day price swings over 1 year",
     "dividend_streak": "Consecutive financial years with a dividend",
+    "deliv_pct": "Share of traded quantity marked for delivery on the latest day",
+    "deliv_pct_avg_20d": "Average delivery share over the last 20 trading days",
+    "promoter_pct": "Promoter and promoter-group share of total shares, latest filed quarter",
+    "promoter_change_1y": "Change in promoter share vs the same quarter a year earlier (percentage points)",
 }
 
 ALIASES = {

@@ -11,6 +11,7 @@ import DidYouKnow from "@/components/DidYouKnow";
 import { SectionNote, StaleDataBanner } from "@/components/Legal";
 import PriceCagr from "@/components/PriceCagr";
 import Signals from "@/components/Signals";
+import { useInView } from "@/lib/useInView";
 import { WatchButton } from "@/components/WatchButton";
 import { ErrorNote, Loading, PageLoading, RangeBar, ScoreBadge, Stat } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -26,6 +27,10 @@ const TotalReturn = dynamic(() => import("@/components/TotalReturn"), { ssr: fal
 const DividendHistory = dynamic(() => import("@/components/DividendHistory"), { ssr: false });
 const CompanyTimeline = dynamic(() => import("@/components/CompanyTimeline"), { ssr: false });
 const PeerRanks = dynamic(() => import("@/components/PeerRanks"), { ssr: false });
+const ValuationHistory = dynamic(() => import("@/components/ValuationHistory"), { ssr: false });
+const Shareholding = dynamic(() => import("@/components/Shareholding"), { ssr: false });
+const DeliveryChart = dynamic(() => import("@/components/DeliveryChart"), { ssr: false });
+const NextEvent = dynamic(() => import("@/components/NextEvent"), { ssr: false });
 const RiskProfile = dynamic(() => import("@/components/RiskProfile"), { ssr: false });
 
 /** Symbol from the URL. Static hosting serves one prebuilt shell for every /stock/<SYMBOL>, so read the real path. */
@@ -58,6 +63,12 @@ function ago(iso: string, asOf: string | null | undefined): string {
   if (days <= 1) return "latest session";
   if (days < 60) return `${days} days ago`;
   return `${Math.round(days / 30.4)} months ago`;
+}
+
+/** Mounts its children (and so starts their fetches) only once scrolled near. */
+function Lazy({ children }: { children: React.ReactNode }) {
+  const { ref, inView } = useInView<HTMLDivElement>();
+  return <div ref={ref} className="min-w-0">{inView && children}</div>;
 }
 
 const FIN_ROWS = [
@@ -122,6 +133,7 @@ export default function StockView() {
               </div>
             )}
             <div className="mt-4"><Signals stock={stock} /></div>
+            <div className="mt-2"><NextEvent symbol={stock.symbol} /></div>
           </div>
           <div className="text-right">
             <div className="num text-5xl font-bold tracking-tight text-white">
@@ -189,7 +201,14 @@ export default function StockView() {
 
       <PeerRanks symbol={stock.symbol} />
 
+      <ValuationHistory symbol={stock.symbol} />
+
       <RiskProfile symbol={stock.symbol} />
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Lazy><Shareholding symbol={stock.symbol} /></Lazy>
+        <Lazy><DeliveryChart symbol={stock.symbol} /></Lazy>
+      </div>
 
       {/* What-if + outlook */}
       {prices && prices.length > 0 && (

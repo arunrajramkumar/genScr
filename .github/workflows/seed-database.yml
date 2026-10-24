@@ -102,6 +102,11 @@ jobs:
         working-directory: backend
         run: python -u -m app.ingest.bhavcopy --from "$SINCE"
 
+      - name: Delivery % (last year, one small file per trading day)
+        continue-on-error: true # NSE may refuse cloud IPs; prices are still loaded
+        working-directory: backend
+        run: python -u -m app.ingest.delivery --from "$(date -u -d '1 year ago' +%F)"
+
       - name: Ticker renames, index history and constituents
         continue-on-error: true
         working-directory: backend

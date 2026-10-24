@@ -18,8 +18,11 @@ COLUMNS = [
     "return_1m", "return_1y", "avg_volume_20d", "turnover", "rsi_14", "sma_50", "sma_200",
     "market_cap", "pe", "pb", "roe", "roce", "debt_to_equity", "net_margin",
     "revenue_growth_yoy", "profit_growth_yoy", "piotroski_f", "altman_z", "dividend_yield",
-    "cagr_3y", "cagr_5y", "volatility_1y", "dividend_streak",
+    "cagr_3y", "cagr_5y", "volatility_1y", "dividend_streak", "deliv_pct", "deliv_pct_avg_20d",
+    "promoter_pct", "promoter_change_1y",
 ]
+
+MIN_DELIV_DAYS = 10  # 20-day delivery average needs at least this many days with a figure
 
 UPSERT = f"""
 INSERT INTO stock_metrics ({", ".join(COLUMNS)}, updated_at)
@@ -47,6 +50,7 @@ def price_metrics(rows: list[dict]) -> dict:
     prev = _f(last["prev_close"]) or (closes[-2] if len(closes) > 1 else None)
     high_52w = max(highs) if highs else None
     vols = [r["volume"] or 0 for r in rows[-20:]]
+    deliv = [_f(r["deliv_pct"]) for r in rows[-20:] if r.get("deliv_pct") is not None]
     return {
         "close": close,
         "change_pct": (close / prev - 1) * 100 if close and prev else None,
@@ -63,6 +67,8 @@ def price_metrics(rows: list[dict]) -> dict:
         "cagr_3y": cagr(closes, 3),
         "cagr_5y": cagr(closes, 5),
         "volatility_1y": volatility(closes),
+        "deliv_pct": _f(last.get("deliv_pct")),
+        "deliv_pct_avg_20d": sum(deliv) / len(deliv) if len(deliv) >= MIN_DELIV_DAYS else None,
     }
 
 
@@ -92,13 +98,30 @@ def run() -> int:
                 actions[r["symbol"]].append({k: _f(v) for k, v in r.items()})
             has_actions = bool(actions)
 
+        # Promoter holding: latest filed quarter, and the change vs the same quarter a year earlier. One query for all.
+        shp = {}
+        if conn.execute("SELECT to_regclass('public.shareholding') AS t").fetchone()["t"]:
+            shp = {r["symbol"]: r for r in conn.execute(
+                """
+                WITH latest AS (
+                    SELECT DISTINCT ON (symbol) symbol, period_end, promoter_pct
+                    FROM shareholding WHERE promoter_pct IS NOT NULL
+                    ORDER BY symbol, period_end DESC
+                )
+                SELECT l.symbol, l.promoter_pct, l.promoter_pct - p.promoter_pct AS promoter_change_1y
+                FROM latest l
+                LEFT JOIN shareholding p
+                  ON p.symbol = l.symbol AND p.period_end = (l.period_end - INTERVAL '1 year')::date
+                """
+            )}
+
         # Stream ~5 years of prices one symbol at a time (a server-side cursor keeps memory flat).
         out = []
         with conn.cursor(name="metrics_prices") as stream:
             stream.itersize = 20_000
             stream.execute(
                 """
-                SELECT symbol, trade_date, close, prev_close, high, low, volume, turnover
+                SELECT symbol, trade_date, close, prev_close, high, low, volume, turnover, deliv_pct
                 FROM prices WHERE trade_date > %s::date - 1900
                 ORDER BY symbol, trade_date
                 """,
@@ -117,6 +140,9 @@ def run() -> int:
                     # Trailing 12-month yield from actual payments: current, and covers every listed company.
                     m["dividend_yield"] = ttm_dividend_yield(acts, as_of, m["close"])
                     m["dividend_streak"] = paying_streak(acts, as_of)
+                s = shp.get(symbol)
+                m["promoter_pct"] = _f(s["promoter_pct"]) if s else None
+                m["promoter_change_1y"] = _f(s["promoter_change_1y"]) if s else None
                 out.append({k: _round(v) for k, v in m.items()})
 
         with conn.cursor() as cur:

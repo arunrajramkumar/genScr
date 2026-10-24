@@ -43,6 +43,8 @@ MERGES = [
        SELECT %(new)s, ex_date, kind, amount, ratio_new, ratio_held, old_fv, new_fv, price, record_date, subject
        FROM corporate_actions WHERE symbol = %(old)s AND ex_date < %(date)s
        ON CONFLICT (symbol, ex_date, kind) DO NOTHING""",
+    # The old ticker's last metrics would otherwise linger as a duplicate listing; a reused ticker's fresh rows stay.
+    "DELETE FROM stock_metrics WHERE symbol = %(old)s AND as_of < %(date)s",
 ]
 
 
