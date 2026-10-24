@@ -10,6 +10,11 @@ export const securityHeaders = [
 
 const staticExport = process.env.STATIC_EXPORT === "1";
 
+// The API address is baked into the static build. Fail loudly instead of shipping a site that calls localhost.
+if (staticExport && !/^https?:\/\//.test(process.env.NEXT_PUBLIC_API_URL ?? "")) {
+  throw new Error("NEXT_PUBLIC_API_URL must be set (e.g. https://genscr-api.onrender.com) for a static export build.");
+}
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,

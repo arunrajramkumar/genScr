@@ -34,4 +34,4 @@ jobs:
       - run: npm run build
       - run: npm run typecheck
       - name: Static export build (what Render deploys)
-        run: STATIC_EXPORT=1 npm run build && test -f out/stock/_/index.html
+        run: STATIC_EXPORT=1 NEXT_PUBLIC_API_URL=https://api.example.invalid npm run build && test -f out/stock/_/index.html
