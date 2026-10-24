@@ -105,3 +105,20 @@ def test_caches_clear_when_data_version_changes(monkeypatch):
     conn.version = 2  # nightly update ran
     ensure_fresh(conn, now=61)
     assert conn.queries == 2 and c.get("k", now=61) is None
+
+
+def test_ensure_fresh_survives_missing_table(monkeypatch):
+    monkeypatch.setattr(cache_mod, "_version", {"value": None, "checked": float("-inf")})
+
+    class BrokenConn:
+        rolled_back = False
+
+        def execute(self, sql):
+            raise RuntimeError('relation "index_prices" does not exist')
+
+        def rollback(self):
+            self.rolled_back = True
+
+    conn = BrokenConn()
+    ensure_fresh(conn, now=0)  # must not raise, and must leave the transaction usable
+    assert conn.rolled_back

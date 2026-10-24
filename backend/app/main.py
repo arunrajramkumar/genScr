@@ -8,7 +8,18 @@ from app.config import settings
 from app.db import pool
 from app.middleware import RateLimiter, make_guard_middleware
 from app.routers import (
-    calendar, compare, delivery, indices, market, relative, screener, search, shareholding, stocks, valuation, watchlist,
+    calendar,
+    compare,
+    delivery,
+    indices,
+    market,
+    relative,
+    screener,
+    search,
+    shareholding,
+    stocks,
+    valuation,
+    watchlist,
 )
 
 
@@ -34,7 +45,8 @@ app.add_middleware(
 
 # watchlist first: its /stocks/batch must not be captured by stocks' /stocks/{symbol}.
 # delivery, shareholding, valuation and relative add /stocks/{symbol}/... routes; register them ahead of stocks.
-for module in (watchlist, delivery, shareholding, valuation, relative, search, stocks, screener, compare, market, indices, calendar):
+ROUTERS = (watchlist, delivery, shareholding, valuation, relative, search, stocks, screener, compare, market, indices, calendar)
+for module in ROUTERS:
     app.include_router(module.router, prefix="/api")
 
 

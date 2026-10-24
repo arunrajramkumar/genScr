@@ -86,7 +86,8 @@ def fundamental_ratios(cur: dict | None, prev: dict | None, close: float | None)
         return out
 
     np_ = cur.get("net_profit")
-    shares = sane_shares(cur.get("shares_outstanding"), np_ * 1e7 / cur["eps"] if np_ and cur.get("eps") and np_ > 0 and cur["eps"] > 0 else None)
+    implied = np_ * 1e7 / cur["eps"] if np_ and cur.get("eps") and np_ > 0 and cur["eps"] > 0 else None
+    shares = sane_shares(cur.get("shares_outstanding"), implied)
     equity = cur.get("total_equity")
     debt = cur.get("total_debt") or 0
 

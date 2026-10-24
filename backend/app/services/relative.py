@@ -77,7 +77,7 @@ def _max_drawdown(values: list[float]) -> float:
 
 
 def _stats(weekly: list[tuple[date, float, float]], monthly: list[tuple[date, float, float]]) -> dict | None:
-    rs = [(b[1] / a[1] - 1, b[2] / a[2] - 1) for a, b in zip(weekly, weekly[1:])]
+    rs = [(b[1] / a[1] - 1, b[2] / a[2] - 1) for a, b in zip(weekly, weekly[1:], strict=False)]
     if len(rs) < 26:
         return None
     n = len(rs)
@@ -86,7 +86,7 @@ def _stats(weekly: list[tuple[date, float, float]], monthly: list[tuple[date, fl
     cov = sum((s - ms) * (i - mi) for s, i in rs) / (n - 1)
     var_s = sum((s - ms) ** 2 for s, _ in rs) / (n - 1)
     var_i = sum((i - mi) ** 2 for _, i in rs) / (n - 1)
-    mr = [(b[1] / a[1] - 1, b[2] / a[2] - 1) for a, b in zip(monthly, monthly[1:])]
+    mr = [(b[1] / a[1] - 1, b[2] / a[2] - 1) for a, b in zip(monthly, monthly[1:], strict=False)]
     up = [(s, i) for s, i in mr if i > 0]
     down = [(s, i) for s, i in mr if i < 0]
 

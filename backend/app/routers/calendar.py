@@ -108,5 +108,6 @@ def get_events(
         return empty
     items = [{k: v for k, v in r.items() if k != "as_of"} for r in rows if r["symbol"] is not None]
     upcoming = sorted((r for r in items if r["event_date"] >= as_of), key=lambda r: (r["event_date"], r["symbol"], r["category"]))
-    recent = sorted((r for r in items if r["event_date"] < as_of), key=lambda r: (-r["event_date"].toordinal(), r["symbol"], r["category"]))
+    recent = sorted((r for r in items if r["event_date"] < as_of),
+                    key=lambda r: (-r["event_date"].toordinal(), r["symbol"], r["category"]))
     return {"as_of": as_of, "upcoming": upcoming, "recent": recent}
