@@ -8,7 +8,20 @@ import { api } from "@/lib/api";
 import { changeClass, fmtPct, fmtPrice } from "@/lib/format";
 import type { Stock } from "@/lib/types";
 
-export default function SearchBox({ large = false, autoFocus = false }: { large?: boolean; autoFocus?: boolean }) {
+interface Props {
+  large?: boolean;
+  autoFocus?: boolean;
+  placeholder?: string;
+  /** Picker mode: called with the chosen stock instead of opening its page. */
+  onPick?: (s: Stock) => void;
+  /** Picker mode: Enter on pasted text like "TCS, INFY" hands over every symbol. */
+  onBulk?: (symbols: string[]) => void;
+  /** Symbols to leave out of the suggestions (e.g. already picked). */
+  exclude?: string[];
+  disabled?: boolean;
+}
+
+export default function SearchBox({ large = false, autoFocus = false, placeholder, onPick, onBulk, exclude, disabled }: Props) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
@@ -25,12 +38,17 @@ export default function SearchBox({ large = false, autoFocus = false }: { large?
         inputRef.current?.focus();
       }
     };
+    if (onPick) return; // the page's main search keeps the shortcut
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+  }, [onPick]);
 
   useEffect(() => {
     const term = q.trim();
+    if (onBulk && /[,\s]/.test(term)) {
+      setResults([]); // a list is being typed or pasted; Enter adds it
+      return;
+    }
     if (!term) {
       setResults([]);
       return;
@@ -51,22 +69,34 @@ export default function SearchBox({ large = false, autoFocus = false }: { large?
     };
   }, [q]);
 
-  const go = (symbol: string) => {
+  const shown = exclude?.length ? results.filter((r) => !exclude.includes(r.symbol)) : results;
+
+  const go = (stock: Stock) => {
     setOpen(false);
     setQ("");
+    if (onPick) {
+      onPick(stock);
+      inputRef.current?.focus(); // ready for the next one
+      return;
+    }
     inputRef.current?.blur();
-    router.push(`/stock/${encodeURIComponent(symbol)}`);
+    router.push(`/stock/${encodeURIComponent(stock.symbol)}`);
   };
 
   const onKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((a) => Math.min(a + 1, results.length - 1));
+      setActive((a) => Math.min(a + 1, shown.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive((a) => Math.max(a - 1, 0));
-    } else if (e.key === "Enter" && results[active]) {
-      go(results[active].symbol);
+    } else if (e.key === "Enter" && onBulk && /[,\s]/.test(q.trim())) {
+      e.preventDefault();
+      onBulk(q.toUpperCase().split(/[\s,]+/).filter(Boolean));
+      setQ("");
+    } else if (e.key === "Enter" && shown[active]) {
+      e.preventDefault();
+      go(shown[active]);
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -87,21 +117,22 @@ export default function SearchBox({ large = false, autoFocus = false }: { large?
           value={q}
           onChange={(e) => setQ(e.target.value)}
           onKeyDown={onKeyDown}
-          onFocus={() => results.length && setOpen(true)}
+          onFocus={() => shown.length && setOpen(true)}
+          disabled={disabled}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder="Search stocks by name or symbol…"
+          placeholder={placeholder ?? "Search stocks by name or symbol…"}
           className={clsx("w-full bg-transparent outline-none placeholder:text-muted", large ? "text-lg" : "text-sm")}
-          aria-label="Search stocks"
+          aria-label={placeholder ?? "Search stocks"}
         />
-        <kbd className="hidden rounded border border-line px-1.5 py-0.5 text-[10px] text-muted sm:block">/</kbd>
+        {!onPick && <kbd className="hidden rounded border border-line px-1.5 py-0.5 text-[10px] text-muted sm:block">/</kbd>}
       </div>
 
-      {open && results.length > 0 && (
+      {open && shown.length > 0 && (
         <ul className="panel absolute z-50 mt-2 max-h-96 w-full overflow-auto p-1 shadow-2xl">
-          {results.map((s, i) => (
+          {shown.map((s, i) => (
             <li key={s.symbol}>
               <button
-                onMouseDown={() => go(s.symbol)}
+                onMouseDown={(e) => { e.preventDefault(); go(s); }}
                 onMouseEnter={() => setActive(i)}
                 className={clsx(
                   "flex w-full items-center justify-between gap-4 rounded-lg px-3 py-2 text-left",
