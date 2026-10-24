@@ -14,6 +14,7 @@ import { changeClass, fmtCr, fmtPct, fmtPrice } from "@/lib/format";
 import type { Overview, Stock } from "@/lib/types";
 import { useInView } from "@/lib/useInView";
 
+const MarketPulse = dynamic(() => import("@/components/MarketPulse"), { ssr: false, loading: () => <Loading /> });
 const MarketHeatmap = dynamic(() => import("@/components/MarketHeatmap"), { ssr: false, loading: () => <Loading /> });
 
 function MoverList({ title, icon, rows, metric }: { title: string; icon: React.ReactNode; rows: Stock[]; metric: "change" | "turnover" }) {
@@ -136,6 +137,8 @@ export default function Home() {
             <MoverList title="Top losers" icon={<ArrowDownRight className="h-4 w-4 text-down" />} rows={data.losers} metric="change" />
             <MoverList title="Most active (turnover)" icon={<Flame className="h-4 w-4 text-amber-400" />} rows={data.active} metric="turnover" />
           </section>
+
+          <MarketPulse />
 
           <LazyHeatmap />
 
