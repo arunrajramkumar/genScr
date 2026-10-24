@@ -120,5 +120,12 @@ def test_ensure_fresh_survives_missing_table(monkeypatch):
             self.rolled_back = True
 
     conn = BrokenConn()
+    c = TTLCache(ttl=1000, maxsize=10)
+    monkeypatch.setattr(cache_mod, "_registry", [c])
     ensure_fresh(conn, now=0)  # must not raise, and must leave the transaction usable
     assert conn.rolled_back
+    c.set("k", b"[]", now=1)  # e.g. an empty list served while the table was missing
+
+    good = FakeConn()
+    ensure_fresh(good, now=61)  # the first good check afterwards drops it
+    assert c.get("k", now=61) is None

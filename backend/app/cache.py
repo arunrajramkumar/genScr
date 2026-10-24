@@ -93,6 +93,7 @@ def ensure_fresh(conn, now: float | None = None) -> None:
         ).fetchone()
     except Exception:  # e.g. a table not created yet on a lagging database: keep the request's transaction usable
         conn.rollback()
+        _version["value"] = "unavailable"  # anything cached meanwhile may be empty: clear on the next good check
         return
     value = (row["v"], row.get("i")) if row else None
     if _version["value"] is not None and value != _version["value"]:
