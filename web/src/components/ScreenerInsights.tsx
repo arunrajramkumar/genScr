@@ -5,7 +5,16 @@ import { Filter as FilterIcon } from "lucide-react";
 import { fmtField } from "@/lib/format";
 
 export interface Dist { count: number; p10?: number; p25?: number; p50?: number; p75?: number; p90?: number; hist_lo?: number; hist_hi?: number; hist?: number[] }
-export interface FunnelStep { label: string; remaining: number }
+export interface FunnelStep { label: string; remaining: number; color?: string }
+
+/** One colour per metric family, used for its filter card, histogram, funnel step, column and bars. */
+export const GROUP_COLORS: Record<string, string> = {
+  Valuation: "#f5b942", Quality: "#00d47e", Growth: "#a78bfa", Returns: "#7c9cff",
+  "Risk & technicals": "#f472b6", Income: "#2dd4bf", Trading: "#22d3ee", Ownership: "#fb923c",
+};
+export const groupColor = (group?: string) => (group && GROUP_COLORS[group]) || "#7c9cff";
+/** Hex colour with alpha (0-1), for inline styles. */
+export const tint = (hex: string, a: number) => hex + Math.round(a * 255).toString(16).padStart(2, "0");
 export type Sizes = { large: number; mid: number; small: number; unknown: number };
 
 const SECTOR_COLORS = ["#7c9cff", "#00d47e", "#f5b942", "#ec4899", "#06b6d4", "#a78bfa", "#64748b"];
@@ -28,11 +37,11 @@ export function percentileOf(d: Dist | undefined, v: number | null): number | nu
 }
 
 /** Thin bar under a value: where it sits in the whole market for that metric (neutral colour: position, not a rating). */
-export function MarketPosition({ pct }: { pct: number | null }) {
+export function MarketPosition({ pct, color = "#7c9cff" }: { pct: number | null; color?: string }) {
   if (pct === null) return null;
   return (
     <div className="ml-auto mt-1 h-1 w-16 overflow-hidden rounded-full bg-white/[0.06]" title={`Higher than about ${Math.round(pct)}% of stocks`}>
-      <div className="h-full rounded-full bg-accent/60" style={{ width: `${Math.max(4, pct)}%` }} />
+      <div className="h-full rounded-full" style={{ width: `${Math.max(4, pct)}%`, background: tint(color, 0.75) }} />
     </div>
   );
 }
@@ -61,8 +70,11 @@ export function Funnel({ universe, steps }: { universe: number; steps: FunnelSte
         {steps.map((s, i) => (
           <li key={i} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3 text-xs">
             <div className="relative h-6 overflow-hidden rounded-md bg-white/[0.04]">
-              <div className={clsx("absolute inset-y-0 left-0 rounded-md transition-all", i === steps.length - 1 ? "bg-accent/45" : "bg-accent/20")}
-                style={{ width: `${Math.max(1, (s.remaining / Math.max(1, universe)) * 100)}%` }} />
+              <div className="absolute inset-y-0 left-0 rounded-md transition-all"
+                style={{
+                  width: `${Math.max(1, (s.remaining / Math.max(1, universe)) * 100)}%`,
+                  background: `linear-gradient(90deg, ${tint(s.color ?? "#7c9cff", 0.45)}, ${tint(s.color ?? "#7c9cff", i === steps.length - 1 ? 0.3 : 0.15)})`,
+                }} />
               <span className="absolute inset-0 flex items-center gap-2 truncate px-2 text-slate-200">
                 {s.label}
                 {i === strictest && <span className="rounded bg-gold/15 px-1.5 text-[10px] text-gold">narrows the most</span>}
@@ -101,7 +113,7 @@ function Stacked({ parts, onPick, active }: { parts: { label: string; n: number;
   );
 }
 
-export interface MedianItem { key: string; label: string; unit: string; value: number | null; market: number | null }
+export interface MedianItem { key: string; label: string; unit: string; value: number | null; market: number | null; color?: string }
 
 /** Matches vs the whole market: medians, company size and sector mix. Descriptive only. */
 export function Glance({ medians, sizes, sectors, total, onSector, activeSector }: {
@@ -118,12 +130,12 @@ export function Glance({ medians, sizes, sectors, total, onSector, activeSector 
           {medians.map((m) => {
             const max = Math.max(m.value ?? 0, m.market ?? 0) || 1;
             return (
-              <div key={m.key} className="rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2">
+              <div key={m.key} className="rounded-lg border border-white/[0.06] bg-black/20 px-3 py-2" style={{ borderLeft: `2px solid ${tint(m.color ?? "#7c9cff", 0.7)}` }}>
                 <div className="truncate text-[11px] text-muted">{m.label}</div>
                 <div className="num text-sm font-semibold text-white">{fmtField(m.value, m.unit, m.key)}</div>
                 {(m.value ?? 0) >= 0 && (m.market ?? 0) >= 0 && (
                   <div className="mt-1.5 space-y-1" aria-hidden>
-                    <div className="h-1 rounded-full bg-accent/70" style={{ width: `${((m.value ?? 0) / max) * 100}%` }} />
+                    <div className="h-1 rounded-full" style={{ width: `${((m.value ?? 0) / max) * 100}%`, background: tint(m.color ?? "#7c9cff", 0.8) }} />
                     <div className="h-1 rounded-full bg-white/20" style={{ width: `${((m.market ?? 0) / max) * 100}%` }} />
                   </div>
                 )}

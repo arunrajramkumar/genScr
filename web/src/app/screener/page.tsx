@@ -5,12 +5,12 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
-import { Activity, ArrowDown, ArrowDownToLine, ArrowUp, Award, CalendarCheck, Check, ChevronDown, Code2, Coins, GitCompare, LineChart, Link2, Plus, Scale, ScatterChart, Search, ShieldCheck, Table2, TrendingUp, X, type LucideIcon } from "lucide-react";
+import { Activity, SlidersHorizontal, ArrowDown, ArrowDownToLine, ArrowUp, Award, CalendarCheck, Check, ChevronDown, Code2, Coins, GitCompare, LineChart, Link2, Plus, Scale, ScatterChart, Search, ShieldCheck, Table2, TrendingUp, X, type LucideIcon } from "lucide-react";
 import { SectionNote } from "@/components/Legal";
 import { ErrorNote, Loading } from "@/components/ui";
 import { api } from "@/lib/api";
 import { changeClass, fmtField, SIGNED_FIELDS } from "@/lib/format";
-import { type Dist, Funnel, Glance, MarketPosition, percentileOf, type Sizes } from "@/components/ScreenerInsights";
+import { type Dist, Funnel, Glance, groupColor, MarketPosition, percentileOf, type Sizes, tint } from "@/components/ScreenerInsights";
 import type { Preset, Stock } from "@/lib/types";
 
 const ScreenerScatter = dynamic(() => import("@/components/ScreenerScatter"), { ssr: false, loading: () => <Loading /> });
@@ -29,6 +29,10 @@ const CORE = ["close", "change_pct", "market_cap", "pe", "roe", "return_1y", "di
 const OPS: Op[] = [">", ">=", "<", "<="];
 const OP_WORDS: Record<Op, string> = { ">": "above", ">=": "at least", "<": "below", "<=": "at most" };
 const COND = /^\s*([a-z_0-9/]+)\s*(>=|<=|>|<)\s*(-?\d+(?:\.\d+)?)\s*$/i;
+const PRESET_COLORS: Record<string, string> = {
+  quality: "#00d47e", value: "#f5b942", growth: "#a78bfa", momentum: "#7c9cff", safe: "#22d3ee",
+  dividend: "#fb923c", streak: "#2dd4bf", steady: "#f472b6", oversold: "#94a3b8",
+};
 const PRESET_ICONS: Record<string, LucideIcon> = {
   quality: Award, value: Scale, growth: TrendingUp, momentum: Activity, safe: ShieldCheck, dividend: Coins,
   streak: CalendarCheck, steady: LineChart, oversold: ArrowDownToLine,
@@ -62,7 +66,7 @@ function passShare(d: Dist | undefined, op: Op, value: number): number | null {
   return inHist ? (pass / inHist) * 100 : null;
 }
 
-function Histogram({ d, op, value }: { d?: Dist; op: Op; value: number | null }) {
+function Histogram({ d, op, value, color }: { d?: Dist; op: Op; value: number | null; color: string }) {
   if (!d?.hist || d.hist_lo === undefined || d.hist_hi === undefined) return null;
   const max = Math.max(1, ...d.hist);
   const span = d.hist_hi - d.hist_lo || 1;
@@ -72,9 +76,9 @@ function Histogram({ d, op, value }: { d?: Dist; op: Op; value: number | null })
       {d.hist.map((n, i) => {
         const mid = d.hist_lo! + (span / d.hist!.length) * (i + 0.5);
         const passing = value !== null && (op === ">" || op === ">=" ? mid >= value : mid <= value);
-        return <div key={i} className={clsx("flex-1 rounded-t-sm", passing ? "bg-accent/70" : "bg-white/10")} style={{ height: `${Math.max(4, (n / max) * 100)}%` }} />;
+        return <div key={i} className="flex-1 rounded-t-sm" style={{ height: `${Math.max(4, (n / max) * 100)}%`, background: passing ? tint(color, 0.75) : "rgba(255,255,255,0.08)" }} />;
       })}
-      {pos !== null && <div className="absolute bottom-0 top-0 w-0.5 bg-gold" style={{ left: `${pos}%` }} />}
+      {pos !== null && <div className="absolute -top-1 bottom-0 w-0.5 rounded bg-white shadow-[0_0_6px_rgba(255,255,255,0.6)]" style={{ left: `${pos}%` }} />}
     </div>
   );
 }
@@ -99,7 +103,7 @@ function FieldPicker({ fields, onPick, onClose }: { fields: Record<string, Field
       <div className="mt-2 max-h-80 overflow-auto">
         {groups.map(([g, ks]) => (
           <div key={g} className="mb-2">
-            <div className="label px-2 py-1">{g}</div>
+            <div className="label flex items-center gap-1.5 px-2 py-1"><span className="h-1.5 w-1.5 rounded-full" style={{ background: groupColor(g) }} />{g}</div>
             {ks.map((k) => (
               <button key={k} onClick={() => onPick(k)} className="block w-full rounded-lg px-2 py-1.5 text-left hover:bg-white/5">
                 <div className="text-sm text-white">{fields[k].label}</div>
@@ -226,6 +230,8 @@ function Screener() {
 
   const filtered = Array.from(new Set(filters.map((f) => f.field)));
   const columns = Array.from(new Set([...filtered, ...CORE])).filter((c) => fields[c]).slice(0, 10);
+  const GROUP_LEGEND = Object.values(fields).reduce<Record<string, number>>((acc, f) => ({ ...acc, [f.group]: (acc[f.group] ?? 0) + 1 }), {});
+  const colorOf = (field: string) => groupColor(fields[field]?.group);
   const describe = (f: { field: string; op: Op; value: number }) =>
     `${fields[f.field]?.label ?? f.field} ${OP_WORDS[f.op]} ${fmtField(f.value, fields[f.field]?.unit ?? "")}`;
   const english = filters
@@ -237,13 +243,14 @@ function Screener() {
     const keys = Array.from(new Set([...(data.filters ?? []).map((f) => f.field), "roe", "pe", "return_1y", "dividend_yield"]));
     const known = keys.filter((k) => fields[k]);
     return known.slice(0, Math.min(6, known.length - (known.length % 2))).map((k) => ({
-      key: k, label: fields[k].label, unit: fields[k].unit, value: data.medians?.[k] ?? null, market: stats?.fields[k]?.p50 ?? null,
+      key: k, label: fields[k].label, unit: fields[k].unit, value: data.medians?.[k] ?? null, market: stats?.fields[k]?.p50 ?? null, color: groupColor(fields[k].group),
     }));
   }, [data, fields, stats]);
 
   const funnel = (data?.funnel ?? []).map((step, i) => ({
     label: step.key === "sector" ? `Sector: ${sector}` : data?.filters[i] ? describe(data.filters[i]) : step.key,
     remaining: step.remaining,
+    color: step.key === "sector" ? "#94a3b8" : colorOf(step.key),
   }));
   const strictest = (() => {
     let prev = data?.universe ?? 0, worst = -1, ratio = 2;
@@ -265,9 +272,21 @@ function Screener() {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Stock screener</h1>
-          <p className="mt-1 text-sm text-muted">Add metrics to build a screen. Each one shows where the whole market sits, so you can see how strict your filter is.</p>
+        <div className="flex items-start gap-3">
+          <span className="mt-0.5 rounded-xl bg-gradient-to-br from-[#7c9cff] via-[#a78bfa] to-[#00d47e] p-2.5 shadow-lg shadow-[#7c9cff]/20">
+            <SlidersHorizontal className="h-5 w-5 text-white" />
+          </span>
+          <div>
+            <h1 className="text-2xl font-bold text-white">Stock screener</h1>
+            <p className="mt-1 text-sm text-muted">Add metrics to build a screen. Each one shows where the whole market sits, so you can see how strict your filter is.</p>
+            <div className="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+              {Object.entries(GROUP_LEGEND).map(([g, n]) => (
+                <span key={g} className="inline-flex items-center gap-1 rounded-full border border-white/[0.06] bg-white/[0.02] px-2 py-0.5 text-slate-300">
+                  <span className="h-1.5 w-1.5 rounded-full" style={{ background: groupColor(g) }} />{g} <span className="num text-muted">{n}</span>
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
         <button onClick={switchMode} className="btn text-xs"><Code2 className="h-3.5 w-3.5" /> {mode === "builder" ? "Type a query" : "Use the builder"}</button>
       </div>
@@ -275,12 +294,13 @@ function Screener() {
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
         {presets.map((p) => {
           const Icon = PRESET_ICONS[p.id] ?? Search;
+          const color = PRESET_COLORS[p.id] ?? "#7c9cff";
           const active = query.replace(/\s+/g, " ").trim() === p.query.replace(/\s+/g, " ").trim();
           return (
             <button key={p.id} onClick={() => applyPreset(p)} aria-pressed={active}
-              className={clsx("group flex items-start gap-2.5 rounded-xl border p-3 text-left transition",
-                active ? "border-accent/60 bg-accent/10" : "border-white/[0.07] bg-white/[0.02] hover:border-accent/40 hover:bg-white/[0.04]")}>
-              <span className={clsx("mt-0.5 rounded-lg p-1.5", active ? "bg-accent/20 text-accent" : "bg-white/5 text-muted group-hover:text-accent")}><Icon className="h-3.5 w-3.5" /></span>
+              className="group flex items-start gap-2.5 rounded-xl border p-3 text-left transition hover:-translate-y-0.5 hover:bg-white/[0.04]"
+              style={{ borderColor: active ? tint(color, 0.6) : "rgba(255,255,255,0.07)", background: active ? tint(color, 0.08) : undefined }}>
+              <span className="mt-0.5 rounded-lg p-1.5" style={{ background: tint(color, active ? 0.25 : 0.12), color }}><Icon className="h-3.5 w-3.5" /></span>
               <span className="min-w-0">
                 <span className="block text-xs font-medium leading-snug text-white">{p.name}</span>
                 <span className="mt-0.5 line-clamp-2 block text-[11px] leading-snug text-muted">{p.description}</span>
@@ -302,9 +322,12 @@ function Screener() {
                 const pass = v !== null ? passShare(d, f.op, v) : null;
                 const hib = meta?.higher_is_better;
                 return (
-                  <div key={f.id} className="rounded-xl border border-white/[0.07] bg-black/25 p-3">
+                  <div key={f.id} className="relative overflow-hidden rounded-xl border border-white/[0.07] bg-black/25 p-3"
+                    style={{ backgroundImage: `linear-gradient(180deg, ${tint(colorOf(f.field), 0.07)}, transparent 60%)` }}>
+                    <div className="absolute inset-x-0 top-0 h-0.5" style={{ background: colorOf(f.field) }} />
                     <div className="flex items-start justify-between gap-2">
                       <div>
+                        <div className="text-[10px] font-medium uppercase tracking-wider" style={{ color: colorOf(f.field) }}>{meta?.group}</div>
                         <div className="text-sm font-medium text-white">{meta?.label ?? f.field}</div>
                         <div className="text-[11px] text-muted">{meta?.description}</div>
                       </div>
@@ -317,7 +340,7 @@ function Screener() {
                       <input value={f.value} onChange={(e) => update(f.id, { value: e.target.value })} inputMode="decimal" className="num w-28 rounded-md border border-line bg-black/30 px-2 py-1 text-sm text-white outline-none focus:border-accent/60" aria-label={`${meta?.label ?? f.field} value`} />
                       <span className="text-xs text-muted">{meta?.unit}</span>
                     </div>
-                    <Histogram d={d} op={f.op} value={v} />
+                    <Histogram d={d} op={f.op} value={v} color={colorOf(f.field)} />
                     <div className="mt-1 flex flex-wrap items-center justify-between gap-1 text-[11px] text-muted">
                       <span>{pass !== null ? <>≈<span className="num text-slate-200">{pass.toFixed(0)}%</span> of the <span className="num">{d?.count.toLocaleString("en-IN")}</span> stocks with this figure pass</> : "No market data"}</span>
                       {d?.p25 !== undefined && d.p75 !== undefined && d.p10 !== undefined && d.p90 !== undefined && d.p50 !== undefined && hib !== null && hib !== undefined && (
@@ -365,6 +388,24 @@ function Screener() {
         </div>
       </div>
 
+      {selected.length > 0 && (
+        <div className="fixed inset-x-0 bottom-16 z-[55] flex justify-center px-4 sm:bottom-20" role="region" aria-label="Stocks selected to compare">
+          <div className="flex max-w-full flex-wrap items-center gap-2 rounded-2xl border border-accent/30 bg-panel/95 px-3 py-2 shadow-2xl shadow-black/60 backdrop-blur">
+            <span className="text-xs text-muted"><span className="num text-white">{selected.length}</span>/5 selected</span>
+            {selected.map((sym) => (
+              <span key={sym} className="inline-flex items-center gap-1 rounded-full bg-white/[0.06] py-0.5 pl-2 pr-1 text-xs text-slate-200">
+                {sym}
+                <button onClick={() => toggleSelect(sym)} aria-label={`Remove ${sym}`} className="rounded-full p-0.5 text-muted hover:bg-white/10 hover:text-white"><X className="h-3 w-3" /></button>
+              </span>
+            ))}
+            {selected.length >= 2
+              ? <Link href={`/compare?symbols=${selected.map(encodeURIComponent).join(",")}`} className="btn-primary text-xs"><GitCompare className="h-3.5 w-3.5" /> Compare {selected.length}</Link>
+              : <span className="text-xs text-muted">pick one more to compare</span>}
+            <button onClick={() => setSelected([])} className="text-xs text-muted hover:text-white">Clear</button>
+          </div>
+        </div>
+      )}
+
       {error && <ErrorNote message={error} />}
       {!data && loading && <Loading />}
 
@@ -379,10 +420,7 @@ function Screener() {
               {loading && <span className="ml-2 text-muted">updating…</span>}
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              {selected.length >= 2 && (
-                <Link href={`/compare?symbols=${selected.map(encodeURIComponent).join(",")}`} className="btn-primary text-xs"><GitCompare className="h-3.5 w-3.5" /> Compare {selected.length}</Link>
-              )}
-              {selected.length === 1 && <span className="text-xs text-muted">Select one more to compare</span>}
+              {selected.length === 0 && <span className="hidden text-xs text-muted md:inline">Tick up to 5 rows to compare</span>}
               <div className="seg">
                 <button onClick={() => setView("table")} className={clsx("seg-btn inline-flex items-center gap-1", view === "table" && "seg-btn-active")}><Table2 className="h-3.5 w-3.5" /> Table</button>
                 <button onClick={() => setView("scatter")} className={clsx("seg-btn inline-flex items-center gap-1", view === "scatter" && "seg-btn-active")}><ScatterChart className="h-3.5 w-3.5" /> Scatter</button>
@@ -421,7 +459,8 @@ function Screener() {
                     <th className="w-8 px-3 py-2" title="Select up to 5 to compare"><span className="sr-only">Select</span></th>
                     <th className="px-2 py-2 font-medium">Company</th>
                     {columns.map((c) => (
-                      <th key={c} onClick={() => toggleSort(c)} className={clsx("cursor-pointer whitespace-nowrap px-3 py-2 text-right font-medium hover:text-white", filtered.includes(c) && "text-accent")}>
+                      <th key={c} onClick={() => toggleSort(c)} className="cursor-pointer whitespace-nowrap px-3 py-2 text-right font-medium hover:text-white"
+                        style={filtered.includes(c) ? { color: colorOf(c), boxShadow: `inset 0 -2px 0 ${tint(colorOf(c), 0.7)}` } : undefined}>
                         <span className="inline-flex items-center gap-1">
                           {fields[c]?.label ?? c}
                           {sort.field === c && (sort.order === "desc" ? <ArrowDown className="h-3 w-3" /> : <ArrowUp className="h-3 w-3" />)}
@@ -432,7 +471,7 @@ function Screener() {
                 </thead>
                 <tbody className={clsx(loading && "opacity-60")}>
                   {data.results.map((s) => (
-                    <tr key={s.symbol} className="table-row">
+                    <tr key={s.symbol} className={clsx("table-row", selected.includes(s.symbol) && "bg-accent/[0.06]")}>
                       <td className="px-3 py-2">
                         <input type="checkbox" checked={selected.includes(s.symbol)} onChange={() => toggleSelect(s.symbol)} disabled={!selected.includes(s.symbol) && selected.length >= 5} aria-label={`Select ${s.symbol} to compare`} className="accent-[#7c9cff]" />
                       </td>
@@ -443,9 +482,10 @@ function Screener() {
                       {columns.map((c) => {
                         const v = s[c as keyof Stock] as string | number | null;
                         return (
-                          <td key={c} className={clsx("num whitespace-nowrap px-3 py-2 text-right", SIGNED_FIELDS.has(c) && changeClass(v), filtered.includes(c) && "bg-accent/[0.04]")}>
+                          <td key={c} className={clsx("num whitespace-nowrap px-3 py-2 text-right", SIGNED_FIELDS.has(c) && changeClass(v))}
+                            style={filtered.includes(c) ? { background: tint(colorOf(c), 0.04) } : undefined}>
                             {fmtField(v, fields[c]?.unit ?? "", c)}
-                            {filtered.includes(c) && <MarketPosition pct={percentileOf(stats?.fields[c], v === null ? null : Number(v))} />}
+                            {filtered.includes(c) && <MarketPosition pct={percentileOf(stats?.fields[c], v === null ? null : Number(v))} color={colorOf(c)} />}
                           </td>
                         );
                       })}
