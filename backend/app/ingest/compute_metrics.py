@@ -9,6 +9,7 @@ from itertools import groupby
 
 from app.db import connect
 from app.services.adjust import adjust
+from app.services.dividends import ttm_dividend_yield
 from app.services.indicators import pct_return, rsi, sma
 from app.services.scores import fundamental_ratios
 
@@ -80,10 +81,12 @@ def run() -> int:
             funds[r["symbol"]].append({k: _f(v) for k, v in r.items()})
 
         actions = defaultdict(list)
-        if conn.execute("SELECT to_regclass('public.corporate_actions') AS t").fetchone()["t"]:
-            for r in conn.execute("SELECT symbol, ex_date, kind, ratio_new, ratio_held, old_fv, new_fv FROM corporate_actions "
-                                  "WHERE kind IN ('bonus', 'split')"):
-                actions[r["symbol"]].append(r)
+        has_actions = bool(conn.execute("SELECT to_regclass('public.corporate_actions') AS t").fetchone()["t"])
+        if has_actions:
+            for r in conn.execute("SELECT symbol, ex_date, kind, amount, ratio_new, ratio_held, old_fv, new_fv "
+                                  "FROM corporate_actions WHERE kind IN ('bonus', 'split', 'dividend')"):
+                actions[r["symbol"]].append({k: _f(v) for k, v in r.items()})
+            has_actions = bool(actions)
 
         prices = conn.execute(
             """
@@ -96,12 +99,16 @@ def run() -> int:
 
         out = []
         for symbol, group in groupby(prices, key=lambda r: r["symbol"]):
-            rows = adjust([{k: _f(v) for k, v in r.items()} for r in group], actions.get(symbol) or None)
+            acts = actions.get(symbol, [])
+            rows = adjust([{k: _f(v) for k, v in r.items()} for r in group], acts or None)
             if rows[-1]["trade_date"] != as_of:
                 continue  # not traded on the latest day (suspended / delisted)
             m = {"symbol": symbol, "as_of": as_of, **price_metrics(rows)}
             f = funds.get(symbol, [])
             m.update(fundamental_ratios(f[0] if f else None, f[1] if len(f) > 1 else None, m["close"]))
+            if has_actions:
+                # Trailing 12-month yield from actual payments: current, and covers every listed company.
+                m["dividend_yield"] = ttm_dividend_yield(acts, as_of, m["close"])
             out.append({k: _round(v) for k, v in m.items()})
 
         with conn.cursor() as cur:

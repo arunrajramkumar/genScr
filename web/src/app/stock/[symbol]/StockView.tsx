@@ -133,7 +133,7 @@ export default function StockView() {
         <Stat label="Market cap" value={fmtCr(stock.market_cap)} />
         <Stat label="P/E" value={fmtNum(stock.pe)} />
         <Stat label="P/B" value={fmtNum(stock.pb)} />
-        <Stat label="Dividend yield" value={fmtPct(stock.dividend_yield, false)} sub={toNum(stock.dividend_yield) === null ? "No dividends in last FY" : "Last FY dividends paid"} />
+        <Stat label="Dividend yield" value={fmtPct(stock.dividend_yield, false)} sub={toNum(stock.dividend_yield) === null ? "Not available" : "Last 12 months"} />
         <Stat label="ROE" value={fmtPct(stock.roe, false)} />
         <Stat label="ROCE" value={fmtPct(stock.roce, false)} />
         <Stat label="Debt / Equity" value={fmtNum(stock.debt_to_equity)} />

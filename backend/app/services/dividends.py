@@ -27,6 +27,19 @@ def share_factor_after(d: date, actions: list[dict]) -> float:
     return f
 
 
+def ttm_dividend_yield(actions: list[dict], as_of: date, close: float | None) -> float | None:
+    """Dividends ex-dated in the 12 months to `as_of`, in today's share terms, as % of `close`."""
+    if not close:
+        return None
+    start = date(as_of.year - 1, as_of.month, min(as_of.day, 28))
+    total = sum(
+        a["amount"] * share_factor_after(a["ex_date"], actions)
+        for a in actions
+        if a["kind"] == "dividend" and a.get("amount") and start < a["ex_date"] <= as_of
+    )
+    return round(total / close * 100, 2)
+
+
 def _close_on_or_before(d: date, dates: list[date], closes: list[float]) -> float | None:
     i = bisect_right(dates, d) - 1
     return closes[i] if i >= 0 else None

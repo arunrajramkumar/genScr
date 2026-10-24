@@ -12,7 +12,7 @@ FIELDS: dict[str, dict] = {
     "change_pct": {"label": "Day Change", "unit": "%", "higher_is_better": True},
     "pe": {"label": "P/E", "unit": "x", "higher_is_better": False},
     "pb": {"label": "P/B", "unit": "x", "higher_is_better": False},
-    "dividend_yield": {"label": "Dividend Yield", "unit": "%", "higher_is_better": True},
+    "dividend_yield": {"label": "Dividend Yield (TTM)", "unit": "%", "higher_is_better": True},
     "roe": {"label": "ROE", "unit": "%", "higher_is_better": True},
     "roce": {"label": "ROCE", "unit": "%", "higher_is_better": True},
     "debt_to_equity": {"label": "Debt / Equity", "unit": "x", "higher_is_better": False},

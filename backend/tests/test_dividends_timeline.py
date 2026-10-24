@@ -4,7 +4,7 @@ import pytest
 
 from app.services.adjust import adjust
 from app.services.compliance import is_compliant
-from app.services.dividends import dividend_history, fy_of, share_factor_after
+from app.services.dividends import dividend_history, fy_of, share_factor_after, ttm_dividend_yield
 from app.services.timeline import build_timeline
 
 
@@ -44,6 +44,22 @@ def test_dividend_history_years_streak_and_adjusted_amounts():
     assert h["stats"]["paying_streak_years"] == 4  # FY20..FY23, current FY24 not complete
     assert h["stats"]["growth_streak_years"] == 3  # adjusted 5 -> 6 -> 8 -> 9: three increases
     assert h["stats"]["first_dividend"] == "2019-06-01"
+
+
+def test_ttm_dividend_yield_uses_last_12_months_in_todays_shares():
+    acts = [
+        {"ex_date": date(2025, 8, 21), "kind": "dividend", "amount": 5.15},   # older than 12 months
+        {"ex_date": date(2025, 11, 4), "kind": "dividend", "amount": 10.25},
+        {"ex_date": date(2026, 2, 18), "kind": "dividend", "amount": 5.5},
+        {"ex_date": date(2026, 7, 31), "kind": "dividend", "amount": 5.5},
+        {"ex_date": date(2026, 9, 4), "kind": "dividend", "amount": 5.25},
+    ]
+    assert ttm_dividend_yield(acts, date(2026, 10, 23), 397.45) == pytest.approx(6.67, abs=0.01)  # Coal India
+    bonus = [{"ex_date": date(2026, 1, 1), "kind": "dividend", "amount": 10},
+             {"ex_date": date(2026, 6, 1), "kind": "bonus", "ratio_new": 1, "ratio_held": 1}]
+    assert ttm_dividend_yield(bonus, date(2026, 10, 1), 50) == pytest.approx(10.0)  # ₹10 pre-bonus = ₹5 now
+    assert ttm_dividend_yield([], date(2026, 10, 1), 50) == 0
+    assert ttm_dividend_yield(acts, date(2026, 10, 23), None) is None
 
 
 def test_dividend_history_empty():
