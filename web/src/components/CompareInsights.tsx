@@ -2,51 +2,40 @@
 
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { Flag, Radar, Sparkles } from "lucide-react";
+import { ArrowDownUp, Radar, Sparkles } from "lucide-react";
 import { LINE_COLORS } from "./chartColors";
 import { SectionNote } from "./Legal";
 import { Loading } from "./ui";
 import { api } from "@/lib/api";
-import { toNum } from "@/lib/format";
+import { fmtField, toNum } from "@/lib/format";
 import type { RanksResponse, Stock, TotalReturnResponse } from "@/lib/types";
 
-const CATEGORIES: { name: string; fields: [keyof Stock, boolean][] }[] = [
-  { name: "Valuation", fields: [["pe", false], ["pb", false]] },
-  { name: "Profitability", fields: [["roe", true], ["roce", true], ["net_margin", true]] },
-  { name: "Growth", fields: [["revenue_growth_yoy", true], ["profit_growth_yoy", true]] },
-  { name: "Balance sheet", fields: [["debt_to_equity", false], ["altman_z", true], ["piotroski_f", true]] },
-  { name: "Income", fields: [["dividend_yield", true]] },
-  { name: "Momentum", fields: [["return_1y", true], ["pct_from_52w_high", true]] },
+// Metrics for the highest/lowest table: field, label, unit.
+const METRICS: [keyof Stock, string, string][] = [
+  ["pe", "P/E", "x"], ["pb", "P/B", "x"], ["roe", "ROE", "%"], ["net_margin", "Net margin", "%"],
+  ["revenue_growth_yoy", "Revenue growth", "%"], ["debt_to_equity", "Debt / equity", "x"],
+  ["dividend_yield", "Dividend yield", "%"], ["return_1y", "1-year return", "%"],
 ];
 
 const AXES: { field: string; label: string }[] = [
   { field: "roe", label: "ROE" },
   { field: "net_margin", label: "Margin" },
   { field: "revenue_growth_yoy", label: "Growth" },
-  { field: "pe", label: "Low P/E" },
-  { field: "debt_to_equity", label: "Low debt" },
+  { field: "pe", label: "P/E" },
+  { field: "debt_to_equity", label: "Debt/equity" },
   { field: "dividend_yield", label: "Yield" },
   { field: "return_1y", label: "1Y return" },
 ];
 
-/** Which stock has the more favourable value on most metrics of each category (factual, per metric). */
-function categoryLeads(stocks: Stock[]) {
-  return CATEGORIES.map((c) => {
-    const wins = new Map<string, string[]>();
-    for (const [field, hib] of c.fields) {
-      const vals = stocks
-        .map((s) => ({ s: s.symbol, v: toNum(s[field] as never) }))
-        .filter((x) => x.v !== null && !(field === "pe" && (x.v as number) <= 0)) as { s: string; v: number }[];
-      if (vals.length < 2) continue;
-      const best = vals.reduce((a, b) => ((hib ? b.v > a.v : b.v < a.v) ? b : a));
-      wins.set(best.s, [...(wins.get(best.s) ?? []), String(field)]);
-    }
-    const ranked = Array.from(wins.entries()).sort((a, b) => b[1].length - a[1].length);
-    const total = c.fields.length;
-    if (!ranked.length) return { name: c.name, leader: null, detail: "Not enough data" };
-    const [leader, fields] = ranked[0];
-    const tie = ranked[1] && ranked[1][1].length === fields.length;
-    return { name: c.name, leader: tie ? null : leader, detail: tie ? "Split between stocks" : `ahead on ${fields.length} of ${total} metric${total > 1 ? "s" : ""}` };
+/** Highest and lowest value per metric: facts, with no view on which end is preferable. */
+function extremes(stocks: Stock[]) {
+  return METRICS.map(([field, label, unit]) => {
+    const vals = stocks.map((s) => ({ s: s.symbol, v: toNum(s[field] as never) }))
+      .filter((x) => x.v !== null && !(field === "pe" && (x.v as number) <= 0)) as { s: string; v: number }[];
+    if (vals.length < 2) return { label, unit, high: null, low: null };
+    const sorted = [...vals].sort((a, b) => b.v - a.v);
+    const high = sorted[0], low = sorted[sorted.length - 1];
+    return high.v === low.v ? { label, unit, high: null, low: null } : { label, unit, high, low };
   });
 }
 
@@ -106,7 +95,7 @@ export default function CompareInsights({ stocks }: { stocks: Stock[] }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, years]);
 
-  const leads = useMemo(() => categoryLeads(stocks), [stocks]);
+  const ends = useMemo(() => extremes(stocks), [stocks]);
   const radar = symbols.map((s) => ({
     symbol: s,
     values: AXES.map((ax) => ranks[s]?.metrics.find((m) => m.field === ax.field)?.market_percentile ?? null),
@@ -168,7 +157,7 @@ export default function CompareInsights({ stocks }: { stocks: Stock[] }) {
         <section className="panel p-5">
           <div className="mb-2 flex items-center gap-2">
             <Radar className="h-5 w-5 text-accent" />
-            <h2 className="text-lg font-semibold text-white">Strength profile</h2>
+            <h2 className="text-lg font-semibold text-white">Percentile profile</h2>
           </div>
           {Object.keys(ranks).length ? <RadarChart series={radar} /> : <Loading />}
           <div className="mt-2 flex flex-wrap justify-center gap-3 text-xs">
@@ -176,33 +165,33 @@ export default function CompareInsights({ stocks }: { stocks: Stock[] }) {
               <span key={s} className="inline-flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: colorOf(s) }} />{s}</span>
             ))}
           </div>
-          <p className="mt-2 text-center text-[11px] text-muted">Each axis: percentile among all NSE stocks (outer edge = ahead of all).</p>
+          <p className="mt-2 text-center text-[11px] text-muted">Each axis: share of NSE stocks with a lower value (centre = lowest, outer edge = highest). Further out is not better or worse.</p>
         </section>
 
         <section className="panel p-5">
           <div className="mb-3 flex items-center gap-2">
-            <Flag className="h-5 w-5 text-up" />
-            <h2 className="text-lg font-semibold text-white">Category leads, metric by metric</h2>
+            <ArrowDownUp className="h-5 w-5 text-accent" />
+            <h2 className="text-lg font-semibold text-white">Highest and lowest, metric by metric</h2>
           </div>
-          <ul className="space-y-2.5">
-            {leads.map((l) => (
-              <li key={l.name} className="flex items-center justify-between gap-3 rounded-xl border border-white/[0.06] bg-black/25 px-3 py-2">
-                <span className="text-sm text-slate-300">{l.name}</span>
-                <span className="text-right text-sm">
-                  {l.leader ? (
-                    <span className="inline-flex items-center gap-1.5 font-semibold text-white">
-                      <span className="h-2 w-2 rounded-full" style={{ background: colorOf(l.leader) }} />{l.leader}
-                    </span>
-                  ) : <span className="text-muted">—</span>}
-                  <span className="block text-[11px] text-muted">{l.detail}</span>
-                </span>
+          <ul className="space-y-2">
+            {ends.map((e) => (
+              <li key={e.label} className="grid grid-cols-[minmax(0,7rem)_1fr_1fr] items-center gap-3 rounded-xl border border-white/[0.06] bg-black/25 px-3 py-2 text-xs">
+                <span className="text-sm text-slate-300">{e.label}</span>
+                {e.high && e.low ? (
+                  <>
+                    <span className="min-w-0"><span className="block text-[10px] uppercase tracking-wider text-muted">Highest</span>
+                      <span className="inline-flex items-center gap-1.5 text-white"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: colorOf(e.high.s) }} />{e.high.s} <span className="num text-slate-300">{fmtField(e.high.v, e.unit)}</span></span></span>
+                    <span className="min-w-0"><span className="block text-[10px] uppercase tracking-wider text-muted">Lowest</span>
+                      <span className="inline-flex items-center gap-1.5 text-white"><span className="h-2 w-2 shrink-0 rounded-full" style={{ background: colorOf(e.low.s) }} />{e.low.s} <span className="num text-slate-300">{fmtField(e.low.v, e.unit)}</span></span></span>
+                  </>
+                ) : <span className="col-span-2 text-muted">Not enough data</span>}
               </li>
             ))}
           </ul>
         </section>
       </div>
       <SectionNote>
-        Category leads count which stock has the more favourable value on each listed metric. Returns are historical, from NSE prices and
+        Highest and lowest show the numerically larger and smaller figure only; neither end is better. Returns are historical, from NSE prices and
         recorded corporate actions, with dividends reinvested. None of this is a ranking or a recommendation.
       </SectionNote>
     </div>

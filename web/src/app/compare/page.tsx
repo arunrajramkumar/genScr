@@ -131,24 +131,23 @@ function Compare() {
   const benchmark = useMemo(() => data && { name: data.benchmark.name, points: data.benchmark.performance }, [data]);
   const ordered = useMemo(() => orderedPerformance, [data]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /** Index of the best stock for a row, or -1 when the field has no direction. */
-  const best = (field: string): number => {
-    const dir = data?.fields[field]?.higher_is_better;
-    if (dir === null || dir === undefined || !data) return -1;
-    let idx = -1, bestVal = 0;
+  /** Index of the stock with the highest value in a row (same rule for every metric; not a judgement), or -1. */
+  const highest = (field: string): number => {
+    if (!data) return -1;
+    let idx = -1, top = 0, ties = 0;
     data.stocks.forEach((s, i) => {
       const v = toNum(s[field as keyof typeof s] as string | number | null);
       if (v === null || (field === "pe" && v <= 0)) return;
-      if (idx === -1 || (dir ? v > bestVal : v < bestVal)) { idx = i; bestVal = v; }
+      if (idx === -1 || v > top) { idx = i; top = v; ties = 0; } else if (v === top) ties++;
     });
-    return idx;
+    return ties ? -1 : idx;
   };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Compare stocks</h1>
-        <p className="mt-1 text-sm text-muted">Search by company name and pick 2 to 5 stocks. The highest or lowest value of each metric is highlighted for reference.</p>
+        <p className="mt-1 text-sm text-muted">Search by company name and pick 2 to 5 stocks. The highest value of each metric is marked with a dot, whichever metric it is.</p>
       </div>
       <StockPicker picked={picked} onChange={setPicked} />
 
@@ -188,7 +187,7 @@ function Compare() {
 
           <CompareInsights stocks={data.stocks} />
 
-          <SectionNote>Highlights mark the numerically higher/lower value only. They are not a ranking or a recommendation.</SectionNote>
+          <SectionNote>The dot marks the highest value in each row, the same way for every metric; a higher value is not better or worse. It is not a ranking or a recommendation.</SectionNote>
           <div className="panel overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
@@ -211,16 +210,16 @@ function Compare() {
                     </tr>,
                     ...fields.filter((f) => data.fields[f]).map((field) => {
                       const meta = data.fields[field];
-                      const winner = best(field);
+                      const high = highest(field);
                       const vals = data.stocks.map((s) => toNum(s[field as keyof typeof s] as string | number | null));
                       const max = Math.max(0, ...vals.map((v) => Math.abs(v ?? 0)));
                       return (
                         <tr key={field} className="table-row">
                           <td className="sticky left-0 bg-panel px-4 py-2 text-muted" style={{ boxShadow: `inset 2px 0 0 ${tint(gc, 0.6)}` }}>{meta?.label ?? field}</td>
                           {data.stocks.map((s, i) => (
-                            <td key={s.symbol} className={clsx("num px-4 py-2 text-right", i === winner && "font-semibold text-up")}>
+                            <td key={s.symbol} className={clsx("num px-4 py-2 text-right", i === high && "font-semibold text-white")}>
                               <span className="inline-flex items-center gap-1">
-                                {i === winner && <span className="h-1.5 w-1.5 rounded-full bg-up" aria-hidden />}
+                                {i === high && <span className="h-1.5 w-1.5 rounded-full bg-white/70" title="Highest value in this row" aria-hidden />}
                                 {fmtField(s[field as keyof typeof s] as string | number | null, meta?.unit ?? "", field)}
                               </span>
                               {vals[i] !== null && max > 0 && (

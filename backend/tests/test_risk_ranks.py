@@ -48,14 +48,14 @@ def test_not_enough_history():
     assert risk_profile(series([100] * 30)) is None
 
 
-def test_percentile_ranks_direction_and_sector():
+def test_percentile_ranks_same_direction_for_every_metric():
     rows = [{"symbol": f"S{i}", "sector": "IT", "roe": i * 5, "debt_to_equity": i / 10, "pe": 10 + i} for i in range(10)]
     rows += [{"symbol": "X", "sector": "Bank", "roe": 50, "debt_to_equity": 5, "pe": -3}]
     r = percentile_ranks("S9", rows)
     roe = next(m for m in r["metrics"] if m["field"] == "roe")
     assert roe["sector_percentile"] == 100 and roe["sector_rank"] == 1 and roe["sector_total"] == 10
     de = next(m for m in r["metrics"] if m["field"] == "debt_to_equity")
-    assert de["sector_percentile"] == 0  # highest debt in sector -> behind everyone
+    assert de["sector_percentile"] == 100 and de["sector_rank"] == 1  # highest value ranks first, whatever the metric
     pe = next(m for m in r["metrics"] if m["field"] == "pe")
     assert pe["market_total"] == 10  # negative P/E excluded
     assert percentile_ranks("NOPE", rows)["metrics"] == []

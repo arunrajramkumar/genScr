@@ -107,6 +107,15 @@ def test_valuation_percentiles_describe_history_not_value():
     assert "weekly readings since" in history
 
 
+def test_peer_positions_have_no_better_or_worse_direction():
+    """Percentile views rank every metric highest-first in one neutral colour; no 'ahead', 'leads' or 'strength'."""
+    for path in ("web/src/components/PeerRanks.tsx", "web/src/components/CompareInsights.tsx"):
+        text = _read(path)
+        assert not re.search(r"bg-(up|down)|Ahead of|favourable|Strength profile|Category leads|Low (P/E|debt)", text), path
+    assert "lower first" not in _read("backend/app/services/ranks.py")
+    assert not re.search(r"\bwinner\b|const best\b|higher_is_better", _read("web/src/app/compare/page.tsx"))
+
+
 @pytest.mark.parametrize("config", ["web/next.config.mjs", "render.yaml"])
 def test_web_security_headers_configured(config):
     cfg = _read(config)
