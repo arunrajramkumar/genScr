@@ -2,17 +2,39 @@ import re
 from datetime import date, timedelta
 from typing import Literal
 
+import psycopg
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.cache import cached
 from app.db import get_conn
 from app.services.adjust import adjust
+from app.services.dividends import dividend_history
 from app.services.facts import build_facts
+from app.services.timeline import build_timeline
+from app.services.total_return import total_return
 
 router = APIRouter(prefix="/stocks", tags=["stocks"])
 
 _SYMBOL = re.compile(r"^[A-Z0-9&\-]{1,20}$")
 _RANGES = {"1m": 31, "6m": 183, "1y": 366, "3y": 3 * 366, "5y": 5 * 366, "max": 50 * 366}
+
+
+def _actions(conn, symbol: str) -> list[dict]:
+    try:
+        return conn.execute(
+            "SELECT ex_date, kind, amount, ratio_new, ratio_held, old_fv, new_fv, price, subject "
+            "FROM corporate_actions WHERE symbol = %s ORDER BY ex_date",
+            (symbol,),
+        ).fetchall()
+    except psycopg.errors.UndefinedTable:  # schema migration not applied yet: behave as "no actions"
+        conn.rollback()
+        return []
+
+
+def _raw_prices(conn, symbol: str) -> list[dict]:
+    return conn.execute(
+        "SELECT trade_date, open, high, low, close, prev_close FROM prices WHERE symbol = %s ORDER BY trade_date", (symbol,)
+    ).fetchall()
 
 
 def normalize_symbol(symbol: str) -> str:
@@ -56,7 +78,7 @@ def get_prices(
         """,
         (symbol, since),
     ).fetchall()
-    rows = adjust(rows)
+    rows = adjust(rows, _actions(conn, symbol) or None)  # None -> fall back to gap heuristic
     return [
         {"time": r["trade_date"].isoformat(), **{k: round(r[k], 2) if r[k] is not None else None
                                                for k in ("open", "high", "low", "close")}, "volume": r["volume"]}
@@ -129,4 +151,43 @@ def get_facts(symbol: str, conn=Depends(get_conn)):
         """,
         (symbol,),
     ).fetchone()
-    return build_facts(stock, prices, fy, rank)
+    return build_facts(stock, prices, fy, rank, actions=_actions(conn, symbol) or None)
+
+
+@router.get("/{symbol}/dividends")
+@cached(maxsize=512)
+def get_dividends(symbol: str, conn=Depends(get_conn)):
+    symbol = normalize_symbol(symbol)
+    return dividend_history(_actions(conn, symbol), _raw_prices(conn, symbol))
+
+
+@router.get("/{symbol}/timeline")
+@cached(maxsize=512)
+def get_timeline(symbol: str, conn=Depends(get_conn)):
+    symbol = normalize_symbol(symbol)
+    stock = conn.execute("SELECT symbol, name, listing_date FROM stocks WHERE symbol = %s", (symbol,)).fetchone()
+    if not stock:
+        raise HTTPException(404, f"{symbol} not found")
+    return build_timeline(stock, _actions(conn, symbol), _raw_prices(conn, symbol))
+
+
+@router.get("/{symbol}/total-return")
+@cached(maxsize=1024)
+def get_total_return(
+    symbol: str,
+    years: int = Query(5, ge=1, le=30),
+    amount: float = Query(10_000, gt=0, le=1e9),
+    conn=Depends(get_conn),
+):
+    symbol = normalize_symbol(symbol)
+    prices = _raw_prices(conn, symbol)
+    if not prices:
+        raise HTTPException(404, f"No prices for {symbol}")
+    end = prices[-1]["trade_date"]
+    start = date(end.year - years, end.month, min(end.day, 28))
+    result = total_return(prices, _actions(conn, symbol), start, amount)
+    if result is None:
+        raise HTTPException(404, "Not enough price history for that period")
+    first = prices[0]["trade_date"]
+    result["available_years"] = int((end - first).days / 365.25 + 0.02)
+    return result

@@ -7,7 +7,7 @@ import { ArrowDownRight, ArrowUpRight, Flame, SlidersHorizontal } from "lucide-r
 import SearchBox from "@/components/SearchBox";
 import TickerTape from "@/components/TickerTape";
 import { StaleDataBanner } from "@/components/Legal";
-import { ErrorNote, Loading, heatClass } from "@/components/ui";
+import { ErrorNote, PageLoading, heatClass } from "@/components/ui";
 import { api } from "@/lib/api";
 import { changeClass, fmtCr, fmtPct, fmtPrice } from "@/lib/format";
 import type { Overview, Stock } from "@/lib/types";
@@ -85,7 +85,7 @@ export default function Home() {
           hint={<>Make sure the API is running and data is loaded. See the README Quick start (<code>make ingest</code>).</>}
         />
       )}
-      {!data && !error && <Loading label="Loading market overview…" />}
+      {!data && !error && <PageLoading />}
 
       {data && !data.as_of && (
         <ErrorNote message="No market data yet." hint={<>Run <code>make ingest</code> to load the latest NSE bhavcopy and compute metrics.</>} />

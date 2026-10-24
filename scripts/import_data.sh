@@ -6,13 +6,13 @@ set -euo pipefail
 
 : "${TARGET_URL:?Set TARGET_URL to the external connection string of the hosted database}"
 IN="${IN:-data/export}"
-TABLES=(stocks prices fundamentals stock_metrics)
+TABLES=(stocks prices fundamentals stock_metrics corporate_actions)
 
 psql "$TARGET_URL" -v ON_ERROR_STOP=1 -q -f db/init.sql
 
 for t in "${TABLES[@]}"; do
   f="$IN/$t.csv.gz"
-  [[ -f "$f" ]] || { echo "missing $f (run scripts/export_data.sh first)"; exit 1; }
+  [[ -f "$f" ]] || { echo "skipping $t: $f not found"; continue; }
   cols=$(gunzip -c "$f" 2>/dev/null | head -1 || true)
   psql "$TARGET_URL" -v ON_ERROR_STOP=1 -q -c "TRUNCATE $t"
   gunzip -c "$f" | psql "$TARGET_URL" -v ON_ERROR_STOP=1 -q -c "\copy $t ($cols) FROM STDIN WITH (FORMAT csv, HEADER)"

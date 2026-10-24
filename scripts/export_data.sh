@@ -6,7 +6,7 @@
 set -euo pipefail
 
 OUT="${OUT:-data/export}"
-TABLES=(stocks prices fundamentals stock_metrics)
+TABLES=(stocks prices fundamentals stock_metrics corporate_actions)
 mkdir -p "$OUT"
 
 run_psql() {

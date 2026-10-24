@@ -91,3 +91,80 @@ export interface CompareResponse {
   fields: Record<string, FieldMeta>;
   performance: Record<string, { time: string; value: number }[]>;
 }
+
+export interface ReturnSummary {
+  shares: number;
+  market_value: number;
+  cash_dividends: number;
+  total_value: number;
+  gain_pct: number;
+  cagr: number | null;
+}
+
+export interface ReturnEvent {
+  date: string;
+  kind: "dividend" | "bonus" | "split";
+  per_share?: number;
+  received?: number;
+  detail?: string;
+  shares_added?: number;
+  shares_after: number;
+}
+
+export interface TotalReturnResponse {
+  amount: number;
+  start_date: string;
+  end_date: string;
+  years: number;
+  available_years: number;
+  buy_price: number;
+  end_price: number;
+  initial_shares: number;
+  bonus_split_shares: number;
+  dividends_received: number;
+  dividend_payments: number;
+  price_only: ReturnSummary;
+  with_dividends: ReturnSummary;
+  reinvested: ReturnSummary;
+  events: ReturnEvent[];
+  series: { time: string; price: number; cash: number; reinvest: number }[];
+  caveats: string[];
+}
+
+export interface DividendPayment {
+  ex_date: string;
+  amount: number;
+  adjusted_amount: number;
+  yield_pct: number | null;
+  subject: string | null;
+}
+
+export interface DividendYear {
+  fy: number;
+  declared: number;
+  adjusted: number;
+  payments: number;
+  yield_pct: number | null;
+}
+
+export interface DividendHistoryResponse {
+  payments: DividendPayment[];
+  years: DividendYear[];
+  stats: {
+    total_payments: number;
+    first_dividend: string | null;
+    paying_streak_years: number;
+    growth_streak_years: number;
+    dps_cagr_5y: number | null;
+    last_fy: DividendYear | null;
+    total_adjusted_since_first: number;
+  };
+}
+
+export interface TimelineEvent {
+  date: string;
+  kind: "listing" | "milestone" | "dividend" | "bonus" | "split" | "rights" | "buyback" | "demerger" | "high" | "drawdown";
+  title: string;
+  text: string;
+  source: string;
+}

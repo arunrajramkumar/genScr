@@ -11,6 +11,9 @@ A fast, transparent stock screener for NSE-listed companies: search, screen, ana
 | **Search** | Typo-tolerant search by symbol or company name (Postgres trigram). Press `/` anywhere to search. |
 | **Market overview** | Breadth (advances/declines, 52W highs and lows), top gainers and losers, most active by turnover, sector heatmap |
 | **Stock page** | Split/bonus-adjusted area or candle chart with 50/200 DMA and OHLC hover readout, signal chips, valuation and return ratios, Piotroski F-score, Altman Z'', RSI, sector peers, annual and quarterly financials |
+| **True return** | ₹10k N years ago with real share counts: shares bought, bonus/split shares, every dividend; price-only vs dividends as cash vs reinvested, with a full event ledger |
+| **Dividend history** | Every payment since 2005, yield at the time, per-FY bars restated for bonuses/splits, paying and growth streaks, 5-year dividend CAGR |
+| **Company journey** | Animated timeline: listing, bonuses, splits, rights, buybacks, demergers, yearly dividends, record high and deepest fall, each with its source |
 | **Did you know?** | Rotating facts per stock computed only from filings, NSE prices and the listing record, each with its source (profit per day, best/worst day, winning streaks, debt-free, sector rank…) |
 | **Price CAGR & dividends** | 1–5 year annualised price growth per stock; trailing dividend yield from the annual cash-flow statement (also in screener and compare) |
 | **What-if calculator** | One-time or monthly SIP, any amount, 1–N years slider: value, gain, CAGR/XIRR, growth chart |
@@ -60,6 +63,7 @@ cd ../web && npm install && npm run dev   # web on :3000
 | EOD prices | NSE bhavcopy (`nsearchives.nseindia.com/content/cm/…`) | Fetched **once per trading day**, cached in Postgres. Both the current UDiFF and pre-July-2024 formats are supported. |
 | Stock list | NSE `EQUITY_L.csv` | Weekly refresh |
 | Sectors | NSE Nifty 500 constituent file | Covers Nifty 500 names; others show no sector |
+| Corporate actions | NSE corporate actions (`app.ingest.corporate_actions`), all symbols by monthly window from 2005, parsed from free-text subjects | Daily job loads the last 15 days |
 | Fundamentals | Companies' financial-results XBRL filings (`app.ingest.results`) | Legacy and SEBI Integrated Filing formats, consolidated preferred, banks supported. Filing indexes come from NSE's website API, so run quarterly at a low request rate. CSV loader is also available. |
 
 Ground rules: never scrape NSE pages per user request, keep request rates low, label prices as end-of-day, and don't publish buy/sell calls. Before commercial launch, confirm redistribution terms with NSE Data & Analytics.

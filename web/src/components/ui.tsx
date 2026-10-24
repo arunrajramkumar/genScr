@@ -1,3 +1,6 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { AlertTriangle, Loader2 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -18,6 +21,26 @@ export function Loading({ label = "Loading…" }: { label?: string }) {
   return (
     <div className="flex items-center gap-2 py-10 text-sm text-muted">
       <Loader2 className="h-4 w-4 animate-spin" /> {label}
+    </div>
+  );
+}
+
+/** Full-page loader that explains free-tier cold starts if loading takes more than a few seconds. */
+export function PageLoading() {
+  const [slow, setSlow] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setSlow(true), 3500);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-center">
+      <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      <div className="text-sm text-slate-300">Loading market data…</div>
+      {slow && (
+        <div className="max-w-sm text-xs text-muted">
+          Waking up the data server. On free hosting it sleeps when idle, so the first visit can take up to a minute.
+        </div>
+      )}
     </div>
   );
 }

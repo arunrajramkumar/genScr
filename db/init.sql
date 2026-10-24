@@ -105,6 +105,23 @@ CREATE TABLE IF NOT EXISTS stock_metrics (
 );
 CREATE INDEX IF NOT EXISTS stock_metrics_mcap_idx ON stock_metrics (market_cap DESC NULLS LAST);
 
+-- Dividends, bonuses, splits, rights, buybacks, demergers (from NSE corporate actions).
+CREATE TABLE IF NOT EXISTS corporate_actions (
+    symbol       TEXT NOT NULL,
+    ex_date      DATE NOT NULL,
+    kind         TEXT NOT NULL CHECK (kind IN ('dividend', 'bonus', 'split', 'rights', 'buyback', 'demerger')),
+    amount       NUMERIC(14, 4),   -- dividend per share in ₹, as declared
+    ratio_new    INT,              -- bonus/rights: new shares ...
+    ratio_held   INT,              -- ... for every N held
+    old_fv       NUMERIC(10, 2),   -- split: face value before
+    new_fv       NUMERIC(10, 2),   -- split: face value after
+    price        NUMERIC(14, 2),   -- rights issue price
+    record_date  DATE,
+    subject      TEXT,             -- original NSE wording
+    PRIMARY KEY (symbol, ex_date, kind)
+);
+CREATE INDEX IF NOT EXISTS corporate_actions_date_idx ON corporate_actions (ex_date);
+
 -- Migrations for databases created before these columns existed (safe to re-run).
 ALTER TABLE fundamentals  ADD COLUMN IF NOT EXISTS dividends_paid NUMERIC(18, 2);
 ALTER TABLE stock_metrics ADD COLUMN IF NOT EXISTS dividend_yield NUMERIC(8, 2);

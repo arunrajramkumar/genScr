@@ -40,7 +40,8 @@ def _dmy(d: date) -> str:
     return d.strftime("%-d %b %Y")
 
 
-def build_facts(stock: dict, prices: list[dict], fy: list[dict], rank: dict | None, today: date | None = None) -> list[dict]:
+def build_facts(stock: dict, prices: list[dict], fy: list[dict], rank: dict | None, today: date | None = None,
+                actions: list[dict] | None = None) -> list[dict]:
     """`prices` oldest first; `fy` newest first."""
     today = today or date.today()
     stock = {k: _f(v) for k, v in stock.items()}
@@ -111,7 +112,7 @@ def build_facts(stock: dict, prices: list[dict], fy: list[dict], rank: dict | No
     rows = [{k: _f(v) for k, v in r.items()} for r in prices]
     if len(rows) >= 250:
         since = _dmy(rows[0]["trade_date"])
-        events = split_factors(rows)  # bonus/split days aren't real moves
+        events = split_factors(rows, actions)  # bonus/split days aren't real moves
         moves = [
             (r["close"] / r["prev_close"] - 1, r["trade_date"])
             for i, r in enumerate(rows)
@@ -140,7 +141,7 @@ def build_facts(stock: dict, prices: list[dict], fy: list[dict], rank: dict | No
             add("win_streak", "flame", "Hot streak",
                 f"Rose {best_streak} sessions in a row, its longest winning run since {since} (ended {_dmy(streak_end)}).", BHAV)
 
-        adj = adjust(rows)
+        adj = adjust(rows, actions)
         peak = max(adj, key=lambda r: r["close"] or 0)
         cur = adj[-1]["close"]
         if peak["close"] and cur:

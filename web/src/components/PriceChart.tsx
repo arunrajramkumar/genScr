@@ -169,3 +169,26 @@ export function GrowthChart({ series, positive }: { series: { time: string; inve
 
   return <div ref={ref} className="h-[260px] w-full" />;
 }
+
+/** Value of the holding over time under the three dividend treatments. */
+export function ReturnLinesChart({ series }: { series: { time: string; price: number; cash: number; reinvest: number }[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ref.current || !series.length) return;
+    const chart = createChart(ref.current, { ...BASE_OPTIONS, handleScroll: false, handleScale: false });
+    const lines: [keyof (typeof series)[number], string, string][] = [
+      ["reinvest", UP, "Reinvested"],
+      ["cash", "#7c9cff", "With dividends"],
+      ["price", "#7d8aa0", "Price only"],
+    ];
+    for (const [key, color, title] of lines) {
+      chart.addLineSeries({ color, lineWidth: key === "price" ? 1 : 2, priceLineVisible: false, title })
+        .setData(series.map((p) => ({ time: p.time, value: Math.round(p[key] as number) })));
+    }
+    chart.timeScale().fitContent();
+    return () => chart.remove();
+  }, [series]);
+
+  return <div ref={ref} className="h-[260px] w-full" />;
+}

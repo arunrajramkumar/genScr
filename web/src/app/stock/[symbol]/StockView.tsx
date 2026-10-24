@@ -11,7 +11,7 @@ import DidYouKnow from "@/components/DidYouKnow";
 import { SectionNote, StaleDataBanner } from "@/components/Legal";
 import PriceCagr from "@/components/PriceCagr";
 import Signals from "@/components/Signals";
-import { ErrorNote, Loading, RangeBar, ScoreBadge, Stat } from "@/components/ui";
+import { ErrorNote, Loading, PageLoading, RangeBar, ScoreBadge, Stat } from "@/components/ui";
 import { api } from "@/lib/api";
 import { changeClass, fmtCr, fmtNum, fmtPct, fmtPrice, fmtVolume, toNum } from "@/lib/format";
 import { ENABLE_PROJECTIONS } from "@/lib/site";
@@ -21,6 +21,9 @@ import type { Candle, Fundamental, Stock } from "@/lib/types";
 const StockChart = dynamic(() => import("@/components/PriceChart").then((m) => m.StockChart), { ssr: false, loading: () => <Loading /> });
 const ReturnsCalculator = dynamic(() => import("@/components/ReturnsCalculator"), { ssr: false, loading: () => <Loading /> });
 const Outlook = dynamic(() => import("@/components/Outlook"), { ssr: false });
+const TotalReturn = dynamic(() => import("@/components/TotalReturn"), { ssr: false });
+const DividendHistory = dynamic(() => import("@/components/DividendHistory"), { ssr: false });
+const CompanyTimeline = dynamic(() => import("@/components/CompanyTimeline"), { ssr: false });
 
 /** Symbol from the URL. Static hosting serves one prebuilt shell for every /stock/<SYMBOL>, so read the real path. */
 function useSymbol(): string | null {
@@ -63,7 +66,7 @@ export default function StockView() {
   }, [symbol]);
 
   if (error) return <ErrorNote message={error} />;
-  if (!stock) return <Loading />;
+  if (!stock) return <PageLoading />;
 
   const change = toNum(stock.change_pct);
   const up = (change ?? 0) >= 0;
@@ -145,6 +148,8 @@ export default function StockView() {
 
       {prices && prices.length > 0 && <PriceCagr prices={prices} />}
 
+      <TotalReturn symbol={stock.symbol} />
+
       {/* What-if + outlook */}
       {prices && prices.length > 0 && (
         <>
@@ -152,6 +157,11 @@ export default function StockView() {
           {ENABLE_PROJECTIONS && <Outlook prices={prices} funds={funds} />}
         </>
       )}
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <DividendHistory symbol={stock.symbol} />
+        <CompanyTimeline symbol={stock.symbol} />
+      </div>
 
       {/* Scores / technicals / peers */}
       <section className="grid gap-4 lg:grid-cols-3">
