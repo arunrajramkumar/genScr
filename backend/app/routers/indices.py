@@ -84,3 +84,11 @@ def get_index(slug: str, conn=Depends(get_conn)):
         "constituents": members,
         "sector_mix": sorted(sectors.items(), key=lambda kv: -kv[1]),
     }
+
+
+@router.get("/{slug}/closes")
+@cached(maxsize=20)
+def index_closes(slug: str, conn=Depends(get_conn)):
+    """Daily closes only, in compact parallel arrays, for overlaying an index on a stock chart."""
+    _, rows = _by_slug(conn, slug)
+    return {"t": [r["trade_date"].isoformat() for r in rows], "c": [r["close"] for r in rows]}

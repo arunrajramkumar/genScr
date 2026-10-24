@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import clsx from "clsx";
 import { ColorType, CrosshairMode, createChart, type IChartApi, type Time } from "lightweight-charts";
+import { api } from "@/lib/api";
 import { changeClass, fmtPct, fmtPrice, fmtVolume } from "@/lib/format";
 import { movingAverage } from "@/lib/returns";
 import { LINE_COLORS } from "./chartColors";
@@ -38,6 +39,16 @@ export function StockChart({ data }: { data: Candle[] }) {
   const [mode, setMode] = useState<"area" | "candle">("area");
   const [showMA, setShowMA] = useState(true);
   const [hover, setHover] = useState<Candle | null>(null);
+  const [showIndex, setShowIndex] = useState(false);
+  const [index, setIndex] = useState<Map<string, number> | null>(null);
+
+  // The Nifty 50 overlay is fetched only when first switched on.
+  useEffect(() => {
+    if (!showIndex || index) return;
+    api<{ t: string[]; c: number[] }>("/indices/nifty-50/closes")
+      .then((d) => setIndex(new Map(d.t.map((t, i) => [t, d.c[i]]))))
+      .catch(() => setShowIndex(false));
+  }, [showIndex, index]);
 
   const visible = useMemo(() => {
     if (!data.length) return [];
@@ -50,6 +61,15 @@ export function StockChart({ data }: { data: Candle[] }) {
   const first = visible[0], last = visible[visible.length - 1];
   const rangeReturn = first && last && first.close ? (last.close / first.close - 1) * 100 : null;
   const positive = (rangeReturn ?? 0) >= 0;
+
+  // Nifty 50 rescaled to start at the stock's first visible close, so both lines share one axis.
+  const overlay = useMemo(() => {
+    if (!showIndex || !index || !visible.length) return null;
+    const pts = visible.filter((d) => index.has(d.time)).map((d) => ({ time: d.time, idx: index.get(d.time)! }));
+    if (pts.length < 2) return null;
+    const scale = visible.find((d) => d.time === pts[0].time)!.close / pts[0].idx;
+    return { line: pts.map((p) => ({ time: p.time, value: +(p.idx * scale).toFixed(2) })), ret: (pts[pts.length - 1].idx / pts[0].idx - 1) * 100 };
+  }, [showIndex, index, visible]);
 
   useEffect(() => {
     if (!ref.current || !visible.length) return;
@@ -80,6 +100,11 @@ export function StockChart({ data }: { data: Candle[] }) {
       }
     }
 
+    if (overlay) {
+      chart.addLineSeries({ color: "#c4cddc", lineWidth: 1, lineStyle: 2, lastValueVisible: false, priceLineVisible: false, crosshairMarkerVisible: false, title: "Nifty 50" })
+        .setData(overlay.line);
+    }
+
     const byTime = new Map(visible.map((d) => [d.time, d]));
     chart.subscribeCrosshairMove((p) => {
       const t = p.time as Time | undefined;
@@ -87,7 +112,7 @@ export function StockChart({ data }: { data: Candle[] }) {
     });
     chart.timeScale().fitContent();
     return () => chart.remove();
-  }, [visible, data, mode, showMA, positive]);
+  }, [visible, data, mode, showMA, positive, overlay]);
 
   const shown = hover ?? last;
 
@@ -105,8 +130,14 @@ export function StockChart({ data }: { data: Candle[] }) {
               {range} {fmtPct(rangeReturn)}
             </span>
           )}
+          {overlay && (
+            <span className="num text-xs text-muted">Nifty 50 <span className={changeClass(overlay.ret)}>{fmtPct(overlay.ret)}</span></span>
+          )}
         </div>
         <div className="flex items-center gap-2">
+          <button onClick={() => setShowIndex((v) => !v)} aria-pressed={showIndex} title="Overlay the Nifty 50, rescaled to the same starting price" className={clsx("seg-btn border border-line", showIndex && "seg-btn-active")}>
+            vs Nifty 50
+          </button>
           <button onClick={() => setShowMA((v) => !v)} className={clsx("seg-btn border border-line", showMA && "seg-btn-active")}>
             <span className="text-gold">50</span>/<span className="text-accent">200</span> DMA
           </button>

@@ -52,3 +52,10 @@ def test_negative_earnings_have_no_pe():
 
 def test_no_fundamentals():
     assert all(v is None for v in fundamental_ratios(None, None, 100).values())
+
+
+def test_sane_shares_replaces_grossly_misscaled_counts():
+    from app.services.scores import sane_shares
+    assert sane_shares(29_517_527_800_000, 294_500_000) == 294_500_000
+    assert sane_shares(295_179_000, 280_000_000) == 295_179_000  # weighted-average drift is tolerated
+    assert sane_shares(None, 1_000) == 1_000 and sane_shares(1_000, None) == 1_000

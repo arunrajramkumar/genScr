@@ -11,6 +11,7 @@ import DidYouKnow from "@/components/DidYouKnow";
 import { SectionNote, StaleDataBanner } from "@/components/Legal";
 import PriceCagr from "@/components/PriceCagr";
 import Signals from "@/components/Signals";
+import { WatchButton } from "@/components/WatchButton";
 import { ErrorNote, Loading, PageLoading, RangeBar, ScoreBadge, Stat } from "@/components/ui";
 import { api } from "@/lib/api";
 import { changeClass, fmtCr, fmtNum, fmtPct, fmtPrice, fmtVolume, toNum } from "@/lib/format";
@@ -37,6 +38,26 @@ function useSymbol(): string | null {
     setSymbol(raw && raw !== "_" ? decodeURIComponent(raw).toUpperCase() : null);
   }, [params.symbol]);
   return symbol;
+}
+
+/** When the 52-week high and low happened, from the (adjusted) daily candles. */
+function extremes52w(prices: Candle[] | null): { high: string; low: string } | null {
+  if (!prices?.length) return null;
+  const cutoff = new Date(prices[prices.length - 1].time).getTime() - 365 * 86_400_000;
+  let hi: Candle | null = null, lo: Candle | null = null;
+  for (const p of prices) {
+    if (new Date(p.time).getTime() < cutoff) continue;
+    if (!hi || p.high >= hi.high) hi = p;
+    if (!lo || p.low <= lo.low) lo = p;
+  }
+  return hi && lo ? { high: hi.time, low: lo.time } : null;
+}
+
+function ago(iso: string, asOf: string | null | undefined): string {
+  const days = Math.round(((asOf ? new Date(asOf).getTime() : Date.now()) - new Date(iso).getTime()) / 86_400_000);
+  if (days <= 1) return "latest session";
+  if (days < 60) return `${days} days ago`;
+  return `${Math.round(days / 30.4)} months ago`;
 }
 
 const FIN_ROWS = [
@@ -75,6 +96,7 @@ export default function StockView() {
   const close = toNum(stock.close);
   const rsi = toNum(stock.rsi_14);
   const finRows = (finView === "FY" ? funds : quarters).slice().reverse();
+  const ext = extremes52w(prices);
 
   return (
     <div className="space-y-6">
@@ -89,6 +111,7 @@ export default function StockView() {
               <h1 className="text-4xl font-bold tracking-tight text-white">{stock.symbol}</h1>
               {stock.sector && <Link href={`/screener?sector=${encodeURIComponent(stock.sector)}`} className="chip">{stock.sector}</Link>}
               <span className="num rounded-full border border-line px-2 py-0.5 text-[10px] text-muted">NSE</span>
+              <WatchButton symbol={stock.symbol} />
             </div>
             <div className="mt-1 text-muted">{stock.name}</div>
             {stock.indices && stock.indices.length > 0 && (
@@ -119,6 +142,11 @@ export default function StockView() {
               <div className="num mt-1.5 flex justify-between text-[10px] text-muted">
                 <span>52W L {fmtPrice(stock.low_52w)}</span><span>52W H {fmtPrice(stock.high_52w)}</span>
               </div>
+              {ext && (
+                <div className="mt-0.5 flex justify-between text-[10px] text-muted/80">
+                  <span title={ext.low}>{ago(ext.low, stock.as_of)}</span><span title={ext.high}>{ago(ext.high, stock.as_of)}</span>
+                </div>
+              )}
             </div>
           </div>
         </div>

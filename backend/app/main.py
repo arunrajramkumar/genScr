@@ -7,7 +7,7 @@ from fastapi.responses import PlainTextResponse
 from app.config import settings
 from app.db import pool
 from app.middleware import RateLimiter, make_guard_middleware
-from app.routers import compare, indices, market, screener, search, stocks
+from app.routers import calendar, compare, indices, market, screener, search, stocks, watchlist
 
 
 @asynccontextmanager
@@ -30,7 +30,8 @@ app.add_middleware(
     max_age=86400,  # browsers cache the preflight for a day
 )
 
-for module in (search, stocks, screener, compare, market, indices):
+# watchlist first: its /stocks/batch must not be captured by stocks' /stocks/{symbol}.
+for module in (watchlist, search, stocks, screener, compare, market, indices, calendar):
     app.include_router(module.router, prefix="/api")
 
 

@@ -1,16 +1,20 @@
 "use client";
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
 import { ArrowDownRight, ArrowUpRight, Flame, SlidersHorizontal } from "lucide-react";
 import SearchBox from "@/components/SearchBox";
 import TickerTape from "@/components/TickerTape";
 import { StaleDataBanner } from "@/components/Legal";
-import { ErrorNote, PageLoading, heatClass } from "@/components/ui";
+import { ErrorNote, Loading, PageLoading, heatClass } from "@/components/ui";
 import { api } from "@/lib/api";
 import { changeClass, fmtCr, fmtPct, fmtPrice } from "@/lib/format";
 import type { Overview, Stock } from "@/lib/types";
+import { useInView } from "@/lib/useInView";
+
+const MarketHeatmap = dynamic(() => import("@/components/MarketHeatmap"), { ssr: false, loading: () => <Loading /> });
 
 function MoverList({ title, icon, rows, metric }: { title: string; icon: React.ReactNode; rows: Stock[]; metric: "change" | "turnover" }) {
   return (
@@ -38,6 +42,17 @@ function MoverList({ title, icon, rows, metric }: { title: string; icon: React.R
         {rows.length === 0 && <li className="text-sm text-muted">No data</li>}
       </ul>
     </div>
+  );
+}
+
+/** Reserves the section's space and mounts the treemap (and downloads its chunk) only once it nears the viewport. */
+function LazyHeatmap() {
+  const { ref, inView } = useInView<HTMLElement>("200px");
+  return (
+    <section ref={ref} className="min-h-[360px]">
+      <h2 className="mb-3 text-lg font-semibold text-white">Market heatmap</h2>
+      {inView && <MarketHeatmap />}
+    </section>
   );
 }
 
@@ -121,6 +136,8 @@ export default function Home() {
             <MoverList title="Top losers" icon={<ArrowDownRight className="h-4 w-4 text-down" />} rows={data.losers} metric="change" />
             <MoverList title="Most active (turnover)" icon={<Flame className="h-4 w-4 text-amber-400" />} rows={data.active} metric="turnover" />
           </section>
+
+          <LazyHeatmap />
 
           {data.sectors.length > 0 && (
             <section>

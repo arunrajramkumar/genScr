@@ -11,6 +11,8 @@ Context IDs are used rather than context dates (older filings sometimes carry wr
 import xml.etree.ElementTree as ET
 from datetime import date
 
+from app.services.scores import sane_shares
+
 CRORE = 1e7
 
 
@@ -77,9 +79,9 @@ def _income_statement(facts: dict, ctx: str, face_value: float | None = None) ->
         "BasicEarningsLossPerShareFromContinuingOperations",
         "BasicEarningsPerShareAfterExtraordinaryItems", "BasicEarningsPerShareBeforeExtraordinaryItems",
     )
-    shares = int(paid_up / face) if paid_up and face else None
-    if shares is None and net_profit and eps and eps > 0 and net_profit > 0:
-        shares = int(round(net_profit / eps))  # rupees / (rupees per share)
+    implied = net_profit / eps if net_profit and eps and eps > 0 and net_profit > 0 else None  # rupees / (rupees per share)
+    shares = sane_shares(paid_up / face if paid_up and face else None, implied)
+    shares = int(round(shares)) if shares else None
     return {
         "revenue": _cr(revenue),
         "operating_profit": _cr(operating_profit),

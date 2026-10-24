@@ -65,6 +65,17 @@ def altman_z(cur: dict) -> float | None:
     return 6.56 * x1 + 3.26 * x2 + 6.72 * x3 + 1.05 * x4
 
 
+def sane_shares(reported: float | None, implied: float | None) -> float | None:
+    """Share count, cross-checked against net profit / EPS.
+
+    Some filings carry a mis-scaled paid-up capital or face value (FIVESTAR once reported 100,000x its real
+    share count). Profit / EPS uses weighted-average shares, so it is only trusted for gross (>3x) mismatches.
+    """
+    if reported and implied and not (1 / 3 <= reported / implied <= 3):
+        return implied
+    return reported or implied
+
+
 def fundamental_ratios(cur: dict | None, prev: dict | None, close: float | None) -> dict:
     """Valuation and return ratios. Percentages are returned as e.g. 18.5 for 18.5%."""
     out = dict.fromkeys(
@@ -74,8 +85,8 @@ def fundamental_ratios(cur: dict | None, prev: dict | None, close: float | None)
     if not cur:
         return out
 
-    shares = cur.get("shares_outstanding")
     np_ = cur.get("net_profit")
+    shares = sane_shares(cur.get("shares_outstanding"), np_ * 1e7 / cur["eps"] if np_ and cur.get("eps") and np_ > 0 and cur["eps"] > 0 else None)
     equity = cur.get("total_equity")
     debt = cur.get("total_debt") or 0
 
