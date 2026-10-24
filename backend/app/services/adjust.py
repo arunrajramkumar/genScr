@@ -35,11 +35,27 @@ def action_factors(rows: list[dict], actions: list[dict]) -> dict[int, float]:
     return out
 
 
+def _dividend_days(rows: list[dict], actions: list[dict]) -> set[int]:
+    dates = [r["trade_date"] for r in rows]
+    out = set()
+    for a in actions:
+        if a["kind"] == "dividend":
+            i = next((j for j, d in enumerate(dates) if d >= a["ex_date"]), None)
+            if i is not None:
+                out.add(i)
+    return out
+
+
 def split_factors(rows: list[dict], actions: list[dict] | None = None) -> dict[int, float]:
-    """{index t: factor} for days where a corporate action took effect (rows oldest first, floats)."""
+    """{index t: factor} for days where a corporate action took effect (rows oldest first, floats).
+
+    Prices stay price-only: NSE's prev_close adjustment for a dividend is ignored, so charts and
+    returns exclude dividends (the total-return view adds them explicitly).
+    """
     out = action_factors(rows, actions) if actions else {}
+    skip = _dividend_days(rows, actions) if actions else set()
     for i in range(1, len(rows)):
-        if i in out:
+        if i in out or i in skip:
             continue
         last_close = rows[i - 1].get("close")
         if not last_close:

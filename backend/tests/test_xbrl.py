@@ -47,6 +47,31 @@ def test_march_filing_yields_quarter_and_full_year():
     assert q["dividends_paid"] is None
 
 
+INSURER = """<?xml version="1.0"?>
+<xbrli:xbrl xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:in-capmkt="http://www.sebi.gov.in/xbrl/in-capmkt">
+  <in-capmkt:Income contextRef="FourD" unitRef="INR">9817786800000</in-capmkt:Income>
+  <in-capmkt:ProfitLossBeforeTax contextRef="FourD" unitRef="INR">575238800000</in-capmkt:ProfitLossBeforeTax>
+  <in-capmkt:ProfitLossAfterTaxAndExtraordinaryItems contextRef="FourD" unitRef="INR">574531500000</in-capmkt:ProfitLossAfterTaxAndExtraordinaryItems>
+  <in-capmkt:PaidUpEquityShareCapital contextRef="OneI" unitRef="INR">63250000000</in-capmkt:PaidUpEquityShareCapital>
+  <in-capmkt:ShareholdersFunds contextRef="OneI" unitRef="INR">1768806100000</in-capmkt:ShareholdersFunds>
+</xbrli:xbrl>"""
+
+
+def test_insurer_taxonomy_with_face_value_fallback():
+    fy = parse_results(INSURER, "LICI", date(2026, 3, 31), "x", face_value=10)[-1]
+    assert fy["net_profit"] == pytest.approx(57453.15)
+    assert fy["total_equity"] == pytest.approx(176880.61)
+    assert fy["shares_outstanding"] == 6_325_000_000  # ₹6,325 Cr paid-up / ₹10 face value
+
+
+def test_shares_fallback_from_profit_and_eps():
+    xml = XBRL.replace("PaidUpValueOfEquityShareCapital", "Unused").replace(
+        '<in-capmkt:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="FourD" unitRef="INRPerShare">0.4<',
+        '<in-capmkt:BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations contextRef="FourD" unitRef="INRPerShare">0.4<')
+    fy = parse_results(xml, "X", date(2026, 3, 31), "x")[-1]
+    assert fy["shares_outstanding"] == round(3660000000 / 0.4)
+
+
 def test_non_march_filing_has_no_fy_row():
     rows = parse_results(XBRL, "ETERNAL", date(2025, 12, 31), "x")
     assert [r["period_type"] for r in rows] == ["Q"]

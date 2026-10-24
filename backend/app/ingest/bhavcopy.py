@@ -53,10 +53,12 @@ def load_range(start: date, end: date, skip_existing: bool = False) -> int:
             }
         d = start
         while d <= end:
-            if d.weekday() < 5 and d not in existing:
+            # Weekends are checked too: NSE holds special sessions (Diwali Muhurat, Budget day, live drills).
+            if d not in existing:
                 text = get_text(http, bhavcopy_url(d))
                 if text is None:
-                    print(f"{d}: no file (holiday or not yet published)")
+                    if d.weekday() < 5:
+                        print(f"{d}: no file (holiday or not yet published)")
                 else:
                     rows = parse_bhavcopy(text)
                     with conn.cursor() as cur:

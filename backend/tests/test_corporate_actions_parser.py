@@ -20,6 +20,8 @@ def by_kind(events):
     ("Annual General Meeting And Dividend Rs.5.25 Per Share", 5.25),
     ("Interim Dividend - Rs    5 Per Share", 5),
     ("Interim Dividend 3 Per Share", 3),
+    ("Interim Dividend - Rs 8 Per Share Special Dividend - Rs 67 Per Share", 75),   # TCS Jan 2023, no separator
+    ("Interim Dividend - Rs 10 Per Share Special Dividend - Rs 66 Per Share", 76),
 ])
 def test_dividend_amounts(subject, amount):
     ev = by_kind(parse_subject(subject, face_value=1))
@@ -50,6 +52,9 @@ def test_bonus_ratios(subject, new, held):
     ("Face Value Split (Sub-Division) - From Rs 10/- Per Share To Re 1/- Per Share", 10, 1),
     ("Face Value Split From Rs 10 To Rs 2", 10, 2),
     ("Sub-Division Of Equity Shares From Rs.5/- To Re.1/-", 5, 1),
+    ("Fv Split Rs.10 To Rs.5", 10, 5),                        # M&M 2010
+    ("Face Value Split Rs.10/- To Re.1/- Per Share", 10, 1),  # SBIN 2014
+    ("Fv Split Rs.10/- To Rs.2/", 10, 2),                     # KEI 2006
 ])
 def test_splits(subject, old, new):
     ev = by_kind(parse_subject(subject))["split"]
@@ -62,6 +67,10 @@ def test_other_kinds():
     assert by_kind(parse_subject("Buy Back"))["buyback"] == {"kind": "buyback"}
     rights = by_kind(parse_subject("Rights 1:5 @ Premium Rs 100/-"))["rights"]
     assert (rights["ratio_new"], rights["ratio_held"], rights["price"]) == (1, 5, 100)
+
+
+def test_bonus_debentures_are_not_bonus_shares():
+    assert parse_subject("Scheme Of Arrangement - Bonus Debentures 1:1") == []  # NTPC 2015: bonds, share count unchanged
 
 
 @pytest.mark.parametrize("subject", ["Interest Payment", "Redemption Of NCD", "Annual General Meeting", ""])

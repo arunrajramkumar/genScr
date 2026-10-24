@@ -17,6 +17,16 @@ def test_bonus_is_back_adjusted():
     assert rows[0]["close"] == 3000.0  # input untouched
 
 
+def test_dividend_day_prev_close_adjustment_is_ignored():
+    from datetime import date
+
+    rows = [{"trade_date": date(2026, 1, 1), "close": 100.0, "prev_close": 100.0},
+            {"trade_date": date(2026, 1, 2), "close": 95.0, "prev_close": 95.0}]  # NSE lowered prev_close for a ₹5 dividend
+    acts = [{"ex_date": date(2026, 1, 2), "kind": "dividend", "amount": 5}]
+    assert adjust(rows, acts)[0]["close"] == 100.0  # price-only: not scaled
+    assert adjust(rows)[0]["close"] == pytest.approx(95.0)  # without action data it's treated as an adjustment
+
+
 def test_no_corporate_action_is_noop():
     rows = [{"close": 100.0, "prev_close": 99.0}, {"close": 101.0, "prev_close": 100.0}]
     assert adjust(rows) == rows

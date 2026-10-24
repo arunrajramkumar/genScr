@@ -11,10 +11,13 @@ import re
 
 _AMOUNT = re.compile(r"(?:rs|re|inr|₹)\.?\s*([\d]+(?:\.\d+)?)", re.IGNORECASE)
 _PERCENT = re.compile(r"([\d]+(?:\.\d+)?)\s*%")
+# An amount that follows a dividend word, e.g. "Interim Dividend - Rs 8 Per Share Special Dividend - Rs 67".
+_DIV_AMOUNT = re.compile(r"div\w*\W{0,4}(?:of\s*)?(?:rs|re|inr|₹)\.?\s*([\d]+(?:\.\d+)?)", re.IGNORECASE)
 _PER_SHARE = re.compile(r"([\d]+(?:\.\d+)?)\s*/?-?\s*(?:per|pr)\s*sh", re.IGNORECASE)  # "Dividend 3 Per Share"
 _BONUS = re.compile(r"bonus\s*(?:issue)?\s*-?\s*(\d+)\s*:\s*(\d+)", re.IGNORECASE)
+# "From" is optional: older subjects read "Fv Split Rs.10 To Rs.5" / "Face Value Split Rs.10/- To Re.1/-".
 _SPLIT = re.compile(
-    r"(?:split|sub-?division).*?from\s*(?:rs|re|inr|₹)?\.?\s*([\d.]+).*?to\s*(?:rs|re|inr|₹)?\.?\s*([\d.]+)",
+    r"(?:split|sub-?division).*?(?:from\s*)?(?:rs|re|inr|₹)\.?\s*([\d.]+).*?to\s*(?:rs|re|inr|₹)?\.?\s*([\d.]+)",
     re.IGNORECASE,
 )
 _RIGHTS = re.compile(r"rights\s*(?:issue)?\s*-?\s*(\d+)\s*:\s*(\d+)(?:.*?(?:@|premium|price)\D*([\d.]+))?", re.IGNORECASE)
@@ -26,6 +29,9 @@ _IGNORED = re.compile(r"\b(interest|redemption|debenture|bond|ncd|warrant)\b", r
 
 def _dividend_amount(part: str, face_value: float | None) -> float | None:
     text = re.split(r"\(?\s*including\b", part, flags=re.IGNORECASE)[0]  # "(including special ...)" is already in the total
+    tied = [float(a) for a in _DIV_AMOUNT.findall(text)]
+    if len(tied) > 1:
+        return sum(tied)  # e.g. interim + special written back to back
     amounts = [float(a) for a in _AMOUNT.findall(text)]
     if amounts:
         return amounts[0]
@@ -59,7 +65,7 @@ def parse_subject(subject: str, face_value: float | None = None) -> list[dict]:
         events.append({"kind": "rights", "ratio_new": None, "ratio_held": None, "price": None})
     if re.search(r"\bbuy\s*-?\s*back\b", s, re.IGNORECASE):
         events.append({"kind": "buyback"})
-    if re.search(r"\b(demerger|scheme of arrangement)\b", s, re.IGNORECASE):
+    if re.search(r"\bdemerger\b", s, re.IGNORECASE):  # "Scheme of Arrangement" alone can mean many things
         events.append({"kind": "demerger"})
 
     total = 0.0

@@ -15,7 +15,7 @@ on:
       task:
         description: What to update
         type: choice
-        options: [prices, stocks, fundamentals, corporate-actions-history, all]
+        options: [prices, stocks, fundamentals, corporate-actions-history, repair-history, all]
         default: prices
 
 permissions:
@@ -86,9 +86,16 @@ jobs:
         run: python -u -m app.ingest.corporate_actions
 
       - name: Corporate actions history since 2005 (one-off, ~10 min)
-        if: env.TASK == 'corporate-actions-history'
+        if: env.TASK == 'corporate-actions-history' || env.TASK == 'repair-history'
         working-directory: backend
         run: python -u -m app.ingest.corporate_actions --from 2005-01-01
+
+      - name: Fill missing trading days, incl. weekend special sessions (one-off, ~20 min)
+        if: env.TASK == 'repair-history'
+        working-directory: backend
+        run: |
+          start=$(psql "$DATABASE_URL" -At -c "SELECT min(trade_date) FROM prices")
+          python -u -m app.ingest.bhavcopy --from "${start:-2021-01-01}" --skip-existing
 
       - name: Latest results filings (Nifty 500)
         if: env.TASK == 'fundamentals' || env.TASK == 'all'

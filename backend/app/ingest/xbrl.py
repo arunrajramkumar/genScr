@@ -46,12 +46,12 @@ def _cr(v: float | None) -> float | None:
     return round(v / CRORE, 2) if v is not None else None
 
 
-def _income_statement(facts: dict, ctx: str) -> dict:
+def _income_statement(facts: dict, ctx: str, face_value: float | None = None) -> dict:
     revenue = _first(facts, ctx, "RevenueFromOperations", "Income")
     other_income = _first(facts, ctx, "OtherIncome")
     interest = _first(facts, ctx, "FinanceCosts")
     depreciation = _first(facts, ctx, "DepreciationDepletionAndAmortisationExpense")
-    pbt = _first(facts, ctx, "ProfitBeforeTax", "ProfitLossFromOrdinaryActivitiesBeforeTax")
+    pbt = _first(facts, ctx, "ProfitBeforeTax", "ProfitLossFromOrdinaryActivitiesBeforeTax", "ProfitLossBeforeTax")
     pre_exceptional = _first(facts, ctx, "ProfitBeforeExceptionalItemsAndTax") or pbt
 
     operating_profit = None  # EBITDA excluding other income; banks report pre-provision profit
@@ -61,25 +61,33 @@ def _income_statement(facts: dict, ctx: str) -> dict:
         operating_profit = _first(facts, ctx, "OperatingProfitBeforeProvisionAndContingencies")
 
     dividends = _first(facts, ctx, "DividendsPaidClassifiedAsFinancingActivities")  # cash outflow; sign varies
-    paid_up = _first(facts, ctx, "PaidUpValueOfEquityShareCapital")
-    face = _first(facts, ctx, "FaceValueOfEquityShareCapital")
+    # Paid-up capital sits on the period (most filers) or the balance-sheet date (insurers).
+    paid_up = (_first(facts, ctx, "PaidUpValueOfEquityShareCapital", "PaidUpEquityShareCapital")
+               or _first(facts, "OneI", "PaidUpValueOfEquityShareCapital", "PaidUpEquityShareCapital", "ShareCapital"))
+    face = _first(facts, ctx, "FaceValueOfEquityShareCapital") or face_value
+    net_profit = _first(
+        facts, ctx,
+        "ProfitOrLossAttributableToOwnersOfParent", "ProfitLossForPeriod",
+        "ProfitLossAfterTaxesMinorityInterestAndShareOfProfitLossOfAssociates", "ProfitLossForThePeriod",  # banks
+        "ProfitLossAfterTaxAndExtraordinaryItems", "ProfitLossAfterTaxBeforeExtraordinaryItems",  # insurers
+    )
+    eps = _first(
+        facts, ctx,
+        "BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations",
+        "BasicEarningsLossPerShareFromContinuingOperations",
+        "BasicEarningsPerShareAfterExtraordinaryItems", "BasicEarningsPerShareBeforeExtraordinaryItems",
+    )
+    shares = int(paid_up / face) if paid_up and face else None
+    if shares is None and net_profit and eps and eps > 0 and net_profit > 0:
+        shares = int(round(net_profit / eps))  # rupees / (rupees per share)
     return {
         "revenue": _cr(revenue),
         "operating_profit": _cr(operating_profit),
         "depreciation": _cr(depreciation),
         "interest": _cr(interest),
         "pbt": _cr(pbt),
-        "net_profit": _cr(_first(
-            facts, ctx,
-            "ProfitOrLossAttributableToOwnersOfParent", "ProfitLossForPeriod",
-            "ProfitLossAfterTaxesMinorityInterestAndShareOfProfitLossOfAssociates", "ProfitLossForThePeriod",  # banks
-        )),
-        "eps": _first(
-            facts, ctx,
-            "BasicEarningsLossPerShareFromContinuingAndDiscontinuedOperations",
-            "BasicEarningsLossPerShareFromContinuingOperations",
-            "BasicEarningsPerShareAfterExtraordinaryItems",
-        ),
+        "net_profit": _cr(net_profit),
+        "eps": eps,
         "cfo": _cr(_first(facts, ctx, "CashFlowsFromUsedInOperatingActivities")),
         "capex": _cr(_first(
             facts, ctx,
@@ -87,7 +95,7 @@ def _income_statement(facts: dict, ctx: str) -> dict:
             "PurchaseOfTangibleAssetsClassifiedAsInvestingActivities",
         )),
         "dividends_paid": _cr(abs(dividends) if dividends is not None else None),
-        "shares_outstanding": int(paid_up / face) if paid_up and face else None,
+        "shares_outstanding": shares,
     }
 
 
@@ -97,7 +105,7 @@ def _balance_sheet(facts: dict, ctx: str) -> dict:
     if debt is None:
         debt = _first(facts, ctx, "Borrowings")  # banks: excludes customer deposits
 
-    equity = _first(facts, ctx, "EquityAttributableToOwnersOfParent", "Equity")
+    equity = _first(facts, ctx, "EquityAttributableToOwnersOfParent", "Equity", "ShareholdersFunds")
     reserves = _first(facts, ctx, "OtherEquity", "ReservesAndSurplus")
     capital = _first(facts, ctx, "Capital")
     if equity is None and capital is not None and reserves is not None:  # banks
@@ -113,20 +121,21 @@ def _balance_sheet(facts: dict, ctx: str) -> dict:
     }
 
 
-def parse_results(xml_text: str, symbol: str, period_end: date, source: str) -> list[dict]:
-    """Rows for one filing: always the quarter (Q); plus the full year (FY) for March filings."""
+def parse_results(xml_text: str, symbol: str, period_end: date, source: str, face_value: float | None = None) -> list[dict]:
+    """Rows for one filing: always the quarter (Q); plus the full year (FY) for March filings.
+    face_value (from NSE's equity list) is a fallback when the filing omits it (e.g. insurers)."""
     facts = extract_facts(xml_text)
     balance = _balance_sheet(facts, "OneI")
     rows = []
 
-    quarter = _income_statement(facts, "OneD")
+    quarter = _income_statement(facts, "OneD", face_value)
     if quarter["revenue"] is not None or quarter["net_profit"] is not None:
         # Quarterly cash flow is rarely reported; keep Q rows to P&L + balance sheet.
         rows.append({**quarter, **balance, "cfo": None, "capex": None, "dividends_paid": None,
                      "symbol": symbol, "period_end": period_end, "period_type": "Q", "source": source})
 
     if period_end.month == 3:
-        year = _income_statement(facts, "FourD")
+        year = _income_statement(facts, "FourD", face_value)
         if year["revenue"] is not None or year["net_profit"] is not None:
             rows.append({**year, **balance, "symbol": symbol, "period_end": period_end,
                          "period_type": "FY", "source": source})

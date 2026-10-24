@@ -95,6 +95,8 @@ def pick_filings(filings: list[dict], years: int, quarters: int) -> list[dict]:
 
 
 def load_symbol(nse: NseClient, conn, symbol: str, years: int, quarters: int) -> int:
+    row = conn.execute("SELECT face_value FROM stocks WHERE symbol = %s", (symbol,)).fetchone()
+    face_value = float(row["face_value"]) if row and row["face_value"] else None
     rows = []
     for f in pick_filings(list_filings(nse, symbol), years, quarters):
         source = ("consolidated" if f["consolidated"] else "standalone") + " xbrl"
@@ -104,7 +106,7 @@ def load_symbol(nse: NseClient, conn, symbol: str, years: int, quarters: int) ->
             if e.response.status_code == 404:  # dead link in NSE's index; skip just this filing
                 continue
             raise
-        rows += parse_results(xml, symbol, f["period_end"], source)
+        rows += parse_results(xml, symbol, f["period_end"], source, face_value)
     if rows:
         with conn.cursor() as cur:
             cur.executemany(UPSERT, [{c: r.get(c) for c in COLUMNS} for r in rows])
