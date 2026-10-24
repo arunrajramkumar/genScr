@@ -1,0 +1,108 @@
+name: Migrate database
+
+# Manual, one-off: copies every genScr table from the current hosted Postgres (Render) straight into a new one
+# (e.g. Neon). Nothing is re-downloaded from NSE, so it takes minutes, not hours.
+#
+#   Render Postgres ──\copy (CSV, gzip)──► runner disk ──\copy──► Neon Postgres ──► row-count check
+#
+# Setup: Repo → Settings → Secrets and variables → Actions
+#          RENDER_DATABASE_URL = current database (External URL)           ← already set
+#          NEON_DATABASE_URL   = new database (Neon "direct" connection string, not the -pooler one)
+# Run:   Actions → Migrate database → Run workflow (type MIGRATE to confirm)
+# Then:  point both RENDER_DATABASE_URL (GitHub) and DATABASE_URL (Render API service) at the Neon URL.
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: Type MIGRATE to copy into the new database
+        required: true
+      since:
+        description: Only copy daily prices from this date (YYYY-MM-DD) to fit a small free tier; empty = all
+        required: false
+        default: ""
+      overwrite:
+        description: Replace tables even if the new database already has data
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: render-db # no daily update writes to the source while it is being copied
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SINCE: ${{ inputs.since }}
+    steps:
+      - name: Check inputs and secrets
+        env:
+          CONFIRM: ${{ inputs.confirm }}
+          SRC: ${{ secrets.RENDER_DATABASE_URL }}
+          DST: ${{ secrets.NEON_DATABASE_URL }}
+        run: |
+          [ "$CONFIRM" = "MIGRATE" ] || { echo "::error::Type MIGRATE in the confirm box"; exit 1; }
+          [ -n "$SRC" ] || { echo "::error::Secret RENDER_DATABASE_URL is not set"; exit 1; }
+          [ -n "$DST" ] || { echo "::error::Secret NEON_DATABASE_URL is not set"; exit 1; }
+          [ "$SRC" != "$DST" ] || { echo "::error::Source and target are the same database"; exit 1; }
+          if [ -n "$SINCE" ] && ! date -d "$SINCE" +%F >/dev/null 2>&1; then echo "::error::since must be YYYY-MM-DD"; exit 1; fi
+          ssl() { case "$1" in *sslmode=*) echo "$1" ;; *\?*) echo "$1&sslmode=require" ;; *) echo "$1?sslmode=require" ;; esac; }
+          SOURCE_URL=$(ssl "$SRC"); TARGET_URL=$(ssl "$DST")
+          echo "::add-mask::$SOURCE_URL"; echo "::add-mask::$TARGET_URL"
+          { echo "SOURCE_URL=$SOURCE_URL"; echo "TARGET_URL=$TARGET_URL"; } >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@v4
+
+      - name: Install the Postgres client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      - name: Both databases reachable; source size
+        run: |
+          psql "$SOURCE_URL" -v ON_ERROR_STOP=1 -qAt -c "SELECT 'source: ' || version()"
+          psql "$TARGET_URL" -v ON_ERROR_STOP=1 -qAt -c "SELECT 'target: ' || version()"
+          psql "$SOURCE_URL" -qAt -c "SELECT 'source size: ' || pg_size_pretty(pg_database_size(current_database()))"
+          if [ -z "$SINCE" ]; then
+            echo "::notice::Copying all prices. Neon's free tier holds about 0.5 GB; if the import runs out of space, re-run with 'since' (e.g. 2022-01-01)."
+          fi
+
+      - name: Refuse to overwrite a database that already has data
+        if: ${{ !inputs.overwrite }}
+        run: |
+          n=$(psql "$TARGET_URL" -qAt -c "SELECT CASE WHEN to_regclass('public.stocks') IS NULL THEN 0 ELSE (SELECT count(*) FROM stocks) END")
+          [ "$n" = "0" ] || { echo "::error::Target already has $n stocks. Re-run with 'overwrite' ticked to replace it."; exit 1; }
+
+      - name: Export from the source
+        run: scripts/export_data.sh
+
+      - name: Import into the target
+        run: scripts/import_data.sh
+
+      - name: Verify row counts match
+        run: |
+          fail=0
+          {
+            echo "### Migration check"
+            echo '| Table | Source | Target | |'
+            echo '|---|---:|---:|---|'
+          } >> "$GITHUB_STEP_SUMMARY"
+          for t in stocks prices fundamentals stock_metrics corporate_actions index_prices index_constituents symbol_changes shareholding events; do
+            where=""
+            [ "$t" = "prices" ] && [ -n "$SINCE" ] && where="WHERE trade_date >= DATE '$SINCE'"
+            s=$(psql "$SOURCE_URL" -qAt -c "SELECT count(*) FROM $t $where" 2>/dev/null || echo "missing")
+            d=$(psql "$TARGET_URL" -qAt -c "SELECT count(*) FROM $t" 2>/dev/null || echo "missing")
+            ok="✅"; [ "$s" = "$d" ] || { ok="❌"; fail=1; }
+            echo "| $t | $s | $d | $ok |" >> "$GITHUB_STEP_SUMMARY"
+          done
+          for q in "max(trade_date) FROM prices" "max(as_of) FROM stock_metrics" "max(trade_date) FROM index_prices"; do
+            s=$(psql "$SOURCE_URL" -qAt -c "SELECT $q"); d=$(psql "$TARGET_URL" -qAt -c "SELECT $q")
+            echo "- latest \`$q\`: source $s, target $d" >> "$GITHUB_STEP_SUMMARY"
+            [ "$s" = "$d" ] || fail=1
+          done
+          psql "$TARGET_URL" -qAt -c "SELECT '- target size: ' || pg_size_pretty(pg_database_size(current_database()))" >> "$GITHUB_STEP_SUMMARY"
+          [ "$fail" = "0" ] || { echo "::error::Counts differ between source and target; see the summary"; exit 1; }
+          echo "All tables match. Next: set RENDER_DATABASE_URL (GitHub) and DATABASE_URL (Render API) to the Neon URL."
