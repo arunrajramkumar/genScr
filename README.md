@@ -11,7 +11,7 @@ A fast, transparent stock screener for NSE-listed companies: search, screen, ana
 | **Search** | Typo-tolerant search by symbol or company name (Postgres trigram). Press `/` anywhere to search. |
 | **Market overview** | Breadth (advances/declines, 52W highs and lows), top gainers and losers, most active by turnover, sector heatmap |
 | **Stock page** | Split/bonus-adjusted area or candle chart with 50/200 DMA and OHLC hover readout, signal chips, valuation and return ratios, Piotroski F-score, Altman Z'', RSI, sector peers, annual and quarterly financials |
-| **True return** | ₹10k N years ago with real share counts: shares bought, bonus/split shares, every dividend; price-only vs dividends as cash vs reinvested, with a full event ledger |
+| **Past returns** | ₹10k N years ago with real share counts: shares bought, bonus/split shares, every dividend; price-only vs dividends as cash vs reinvested, with a full event ledger |
 | **Dividend history** | Every payment since 2005, yield at the time, per-FY bars restated for bonuses/splits, paying and growth streaks, 5-year dividend CAGR |
 | **Where it stands** | Percentile rank vs sector peers and all NSE stocks on 12 metrics (ROE, margins, growth, P/E, debt, yield, returns, size) |
 | **Risk & seasonality** | Worst drawdowns with recovery time, distance from peak, volatility, up-days %, underwater chart, calendar-year returns, monthly heatmap |

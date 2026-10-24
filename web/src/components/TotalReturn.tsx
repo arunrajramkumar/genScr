@@ -45,7 +45,10 @@ export default function TotalReturn({ symbol }: { symbol: string }) {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Sparkles className="h-5 w-5 text-gold" />
-          <h2 className="text-lg font-semibold text-white">True return: dividends, bonuses &amp; splits included</h2>
+          <div>
+            <h2 className="text-lg font-semibold text-white">Past returns</h2>
+            <p className="text-xs text-muted">Including dividends, bonus shares and splits</p>
+          </div>
         </div>
         <div className="flex flex-wrap gap-1.5">
           {AMOUNTS.map((a) => (
