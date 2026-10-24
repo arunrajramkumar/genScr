@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
 import { BookA, Search } from "lucide-react";
-import { ErrorNote, Loading } from "@/components/ui";
+import { ErrorNote, Loading, PageLoading } from "@/components/ui";
 import { api } from "@/lib/api";
 import { changeClass, fmtPct, fmtPrice } from "@/lib/format";
 
@@ -24,18 +24,24 @@ function Directory() {
   const [filter, setFilter] = useState("");
 
   useEffect(() => {
+    let live = true; // ignore a slow response for a letter the user has already left
     setError(null);
     setFilter("");
-    api<Browse>(`/stocks/browse?letter=${encodeURIComponent(letter)}&by=${by}`).then(setData).catch((e) => setError(e.message));
+    api<Browse>(`/stocks/browse?letter=${encodeURIComponent(letter)}&by=${by}`)
+      .then((d) => live && setData(d))
+      .catch((e) => live && setError(e.message));
+    return () => { live = false; };
   }, [letter, by]);
+  // The previous letter's data stays for the letter bar counts, but its rows are never shown as this letter's.
+  const current = data?.letter === letter && data?.by === by ? data : null;
 
   const go = (l: string, b = by) => router.replace(`/stocks?letter=${encodeURIComponent(l)}${b === "symbol" ? "&by=symbol" : ""}`, { scroll: false });
 
   const rows = useMemo(() => {
     const f = filter.trim().toLowerCase();
-    const list = data?.letter === letter ? data.stocks : [];
+    const list = current?.stocks ?? [];
     return f ? list.filter((r) => r.symbol.toLowerCase().includes(f) || r.name.toLowerCase().includes(f)) : list;
-  }, [data, letter, filter]);
+  }, [current, filter]);
 
   return (
     <div className="space-y-5">
@@ -73,13 +79,13 @@ function Directory() {
             <input value={filter} onChange={(e) => setFilter(e.target.value)} placeholder={`Narrow down within "${letter}"…`}
               className="w-full rounded-lg border border-line bg-panel py-1.5 pl-8 pr-2 text-sm text-white outline-none focus:border-accent/60" aria-label="Filter this letter" />
           </label>
-          {data && <span className="text-muted"><span className="num text-white">{rows.length}</span> of {data.letters[letter] ?? 0}</span>}
+          {current && <span className="text-muted"><span className="num text-white">{rows.length}</span> of {current.letters[letter] ?? 0}</span>}
         </div>
       </div>
 
       {error && <ErrorNote message={error} />}
-      {!data && !error && <Loading />}
-      {data && (
+      {!current && !error && <PageLoading />}
+      {current && (
         rows.length ? (
           <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
             {rows.map((r) => (
@@ -97,9 +103,9 @@ function Directory() {
               </li>
             ))}
           </ul>
-        ) : <p className="panel p-6 text-center text-sm text-muted">No companies match “{filter}” under {letter}.</p>
+        ) : <p className="panel p-6 text-center text-sm text-muted">{filter ? `No companies match “${filter}” under ${letter}.` : `No companies under ${letter}.`}</p>
       )}
-      {data?.truncated && <p className="text-center text-xs text-muted">Showing the first {data.stocks.length}. Use the box above or the search bar to find the rest.</p>}
+      {current?.truncated && <p className="text-center text-xs text-muted">Showing the first {current.stocks.length}. Use the box above or the search bar to find the rest.</p>}
     </div>
   );
 }
