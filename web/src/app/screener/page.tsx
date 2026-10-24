@@ -18,7 +18,7 @@ const ScreenerScatter = dynamic(() => import("@/components/ScreenerScatter"), { 
 type Op = ">" | ">=" | "<" | "<=";
 interface Filter { id: number; field: string; op: Op; value: string }
 interface FieldInfo { label: string; unit: string; higher_is_better: boolean | null; description: string; group: string }
-interface Stats { fields: Record<string, Dist>; sectors: string[]; universe: number }
+interface Stats { fields: Record<string, Dist>; sectors: string[]; sector_counts?: [string, number][]; universe: number }
 interface Result {
   count: number; total: number; universe: number; results: Stock[];
   filters: { field: string; op: Op; value: number }[]; funnel: { key: string; remaining: number }[];
@@ -122,6 +122,7 @@ function Screener() {
   const params = useSearchParams();
   const [fields, setFields] = useState<Record<string, FieldInfo>>({});
   const [stats, setStats] = useState<Stats | null>(null);
+  const sectorCounts: [string, number][] = stats?.sector_counts ?? (stats?.sectors ?? []).map((s) => [s, 0] as [string, number]);
   const [presets, setPresets] = useState<Preset[]>([]);
   const [filters, setFilters] = useState<Filter[]>([]);
   const [sector, setSector] = useState<string>(params.get("sector") ?? "");
@@ -361,9 +362,9 @@ function Screener() {
                 {picker && <FieldPicker fields={fields} onPick={addFilter} onClose={() => setPicker(false)} />}
               </div>
             </div>
-            {english.length > 0 && (
+            {(english.length > 0 || sector) && (
               <p className="mt-3 text-sm text-slate-300">
-                <span className="text-muted">Showing companies with </span>
+                <span className="text-muted">Showing companies{english.length > 0 ? " with " : ""}</span>
                 {english.join(", ").replace(/, ([^,]*)$/, " and $1")}
                 {sector ? <> in <span className="text-white">{sector}</span></> : ""}.
               </p>
@@ -376,15 +377,33 @@ function Screener() {
           </>
         )}
         {data && <Funnel universe={data.universe} steps={funnel} />}
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line pt-3 text-xs">
-          <span className="text-muted">Sector</span>
-          <div className="relative">
-            <select value={sector} onChange={(e) => setSector(e.target.value)} className="appearance-none rounded-md border border-line bg-panel py-1 pl-2 pr-7 text-slate-200" aria-label="Sector">
-              <option value="">All sectors</option>
-              {stats?.sectors.map((s) => <option key={s} value={s}>{s}</option>)}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2 top-1.5 h-3.5 w-3.5 text-muted" />
+        <div className="mt-3 border-t border-line pt-3 text-xs">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="inline-flex items-center gap-1.5 text-muted"><span className="h-2 w-2 rounded-full" style={{ background: "#94a3b8" }} />Sector</span>
+            <div className="relative">
+              <select value={sector} onChange={(e) => setSector(e.target.value)} className="appearance-none rounded-md border border-line bg-panel py-1 pl-2 pr-7 text-slate-200" aria-label="Sector">
+                <option value="">All sectors{stats ? ` (${sectorCounts.length})` : ""}</option>
+                {sectorCounts.map(([s, n]) => <option key={s} value={s}>{s} ({n})</option>)}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-2 top-1.5 h-3.5 w-3.5 text-muted" />
+            </div>
+            {sector && <button onClick={() => setSector("")} className="text-accent hover:underline">Clear sector</button>}
+            <span className="text-muted">Number = stocks with data in that sector</span>
           </div>
+          {sectorCounts.length > 0 && (
+            <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="Filter by sector">
+              {sectorCounts.map(([s, n]) => {
+                const active = s === sector;
+                return (
+                  <button key={s} onClick={() => setSector(active ? "" : s)} aria-pressed={active}
+                    className={clsx("inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 transition",
+                      active ? "border-slate-300/60 bg-slate-400/20 text-white" : "border-line bg-white/[0.02] text-slate-300 hover:border-slate-400/50 hover:text-white")}>
+                    {s}<span className="num text-muted">{n}</span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 

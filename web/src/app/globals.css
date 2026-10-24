@@ -33,6 +33,19 @@ input[type="range"].slider::-webkit-slider-thumb {
 input[type="range"].slider::-moz-range-thumb {
   @apply h-5 w-5 rounded-full border-2 border-white bg-accent;
 }
+/* YearSlider draws its own track, fill and year dots underneath. */
+input[type="range"].slider-ticks {
+  @apply h-6 bg-transparent;
+}
+input[type="range"].slider-ticks::-webkit-slider-runnable-track {
+  @apply h-6 bg-transparent;
+}
+input[type="range"].slider-ticks::-webkit-slider-thumb {
+  margin-top: 2px; /* (24px track - 20px thumb) / 2: centre the thumb on the dots */
+}
+input[type="range"].slider-ticks::-moz-range-track {
+  background: transparent;
+}
 
 @layer components {
   .panel {

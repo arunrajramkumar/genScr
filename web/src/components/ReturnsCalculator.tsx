@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import clsx from "clsx";
+import YearSlider from "./YearSlider";
 import { Calculator, Repeat, Wallet } from "lucide-react";
 import { GrowthChart } from "./PriceChart";
 import { availableYears, lumpsum, sip } from "@/lib/returns";
@@ -77,8 +78,7 @@ export default function ReturnsCalculator({ symbol, prices }: { symbol: string; 
               <span className="label">Invested</span>
               <span className="num text-lg font-semibold text-white">{years} {years === 1 ? "year" : "years"} ago</span>
             </div>
-            <input type="range" min={1} max={maxYears} value={years} onChange={(e) => setYears(Number(e.target.value))} className="slider" aria-label="Years ago" />
-            <div className="num mt-1 flex justify-between text-[10px] text-muted"><span>1Y</span><span>{maxYears}Y</span></div>
+            <YearSlider value={years} max={maxYears} onChange={setYears} />
           </div>
 
           {result && (

@@ -3,6 +3,7 @@
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
 import clsx from "clsx";
+import YearSlider from "./YearSlider";
 import { Gift, Layers, Scissors, Sparkles, Wallet } from "lucide-react";
 import { SectionNote } from "./Legal";
 import { Loading } from "./ui";
@@ -62,7 +63,7 @@ export default function TotalReturn({ symbol }: { symbol: string }) {
           <span className="label">Invested</span>
           <span className="num text-lg font-semibold text-white">{years} year{years > 1 ? "s" : ""} ago</span>
         </div>
-        <input type="range" min={1} max={maxYears} value={Math.min(years, maxYears)} onChange={(e) => setYears(Number(e.target.value))} className="slider" aria-label="Years ago" />
+        <YearSlider value={Math.min(years, maxYears)} max={maxYears} onChange={setYears} />
       </div>
 
       {error && <p className="mt-4 text-sm text-muted">{error}</p>}

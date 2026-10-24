@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import clsx from "clsx";
-import { GitCompare, Layers } from "lucide-react";
+import { GitCompare, Layers, Search, X } from "lucide-react";
 import { SectionNote, StaleDataBanner } from "@/components/Legal";
 import { ErrorNote, PageLoading } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -20,6 +20,7 @@ export default function IndicesPage() {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [sort, setSort] = useState<{ key: keyof IndexSummary; dir: 1 | -1 }>({ key: "return_1y", dir: -1 });
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     api<IndexSummary[]>("/indices").then(setData).catch((e) => setError(e.message));
@@ -27,12 +28,19 @@ export default function IndicesPage() {
 
   const groups = useMemo(() => {
     const g = new Map<string, IndexSummary[]>();
-    (data ?? []).forEach((i) => g.set(i.category, [...(g.get(i.category) ?? []), i]));
+    // Every query word must start a word of the name or category: "bank psu" finds Nifty PSU Bank, "it" doesn't match "Quality".
+    const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+    const matches = (i: IndexSummary) => {
+      const parts = `${i.name} ${i.category}`.toLowerCase().split(/[^a-z0-9]+/);
+      return words.every((w) => parts.some((p) => p.startsWith(w)));
+    };
+    (data ?? []).filter(matches).forEach((i) => g.set(i.category, [...(g.get(i.category) ?? []), i]));
     for (const [k, v] of g) {
       g.set(k, [...v].sort((a, b) => ((a[sort.key] as number) ?? -1e9) < ((b[sort.key] as number) ?? -1e9) ? -sort.dir : sort.dir));
     }
     return ORDER.filter((k) => g.has(k)).map((k) => [k, g.get(k)!] as const);
-  }, [data, sort]);
+  }, [data, sort, query]);
+  const shown = groups.reduce((n, [, items]) => n + items.length, 0);
 
   const toggle = (slug: string) => setSelected((s) => (s.includes(slug) ? s.filter((x) => x !== slug) : s.length >= 6 ? s : [...s, slug]));
   const head = (key: keyof IndexSummary, label: string) => (
@@ -70,6 +78,29 @@ export default function IndicesPage() {
             </Link>
           ))}
         </section>
+      )}
+
+      <div className="sticky top-16 z-20 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-bg/90 p-2 backdrop-blur">
+        <label className="relative min-w-[240px] flex-1">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted" />
+          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search indices, e.g. bank, IT, midcap, momentum…"
+            aria-label="Search indices" className="w-full rounded-lg border border-line bg-panel py-2 pl-9 pr-9 text-sm text-white placeholder:text-muted focus:border-accent/60 focus:outline-none" />
+          {query && (
+            <button onClick={() => setQuery("")} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted hover:text-white"><X className="h-4 w-4" /></button>
+          )}
+        </label>
+        <span className="num text-xs text-muted">{shown} of {data.length} indices</span>
+        <div className="flex flex-wrap gap-1.5">
+          {["Bank", "IT", "Pharma", "Midcap", "Smallcap", "Momentum", "PSU"].map((w) => (
+            <button key={w} onClick={() => setQuery(w)} className={clsx("chip", query.toLowerCase() === w.toLowerCase() && "border-accent/60 text-white")}>{w}</button>
+          ))}
+        </div>
+      </div>
+
+      {shown === 0 && (
+        <div className="panel p-8 text-center text-sm text-muted">
+          No index matches &quot;{query}&quot;. <button onClick={() => setQuery("")} className="text-accent hover:underline">Show all</button>
+        </div>
       )}
 
       {groups.map(([cat, items]) => (

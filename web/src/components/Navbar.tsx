@@ -10,6 +10,7 @@ import { SITE_NAME } from "@/lib/site";
 const LINKS = [
   { href: "/", label: "Markets" },
   { href: "/indices", label: "Indices" },
+  { href: "/stocks", label: "Stocks A–Z" },
   { href: "/screener", label: "Screener" },
   { href: "/compare", label: "Compare" },
   { href: "/calendar", label: "Calendar" },

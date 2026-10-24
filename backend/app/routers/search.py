@@ -44,3 +44,41 @@ def search(
         """,
         {"q": q, "prefix": f"{esc}%", "contains": f"%{esc}%", "word": f"% {esc}%", "limit": limit},
     ).fetchall()
+
+
+BROWSE_LIMIT = 600
+DIGITS = "0-9"
+
+
+def browse_sql(letter: str, by: str) -> tuple[str, dict]:
+    """Stocks whose name (or symbol) starts with `letter` ("0-9" = any digit), alphabetical."""
+    col = "s.symbol" if by == "symbol" else "s.name"
+    cond = f"{col} ~ '^[0-9]'" if letter == DIGITS else f"upper({col}) LIKE %(prefix)s"
+    sql = (
+        "SELECT s.symbol, s.name, s.sector, m.close, m.change_pct, m.market_cap "
+        "FROM stocks s LEFT JOIN stock_metrics m USING (symbol) "
+        f"WHERE {cond} ORDER BY upper({col}), s.symbol LIMIT %(limit)s"
+    )
+    return sql, {"prefix": f"{letter}%", "limit": BROWSE_LIMIT}
+
+
+def letter_counts_sql(by: str) -> str:
+    col = "s.symbol" if by == "symbol" else "s.name"
+    return (
+        f"SELECT CASE WHEN {col} ~ '^[0-9]' THEN '{DIGITS}' ELSE upper(left({col}, 1)) END AS letter, count(*) AS n "
+        "FROM stocks s GROUP BY 1 ORDER BY 1"
+    )
+
+
+@router.get("/stocks/browse")
+@cached(maxsize=64)
+def browse(
+    letter: str = Query("A", pattern=r"^([A-Z]|0-9)$", description="A to Z, or 0-9"),
+    by: str = Query("name", pattern=r"^(name|symbol)$"),
+    conn=Depends(get_conn),
+):
+    """A-Z directory of listed companies."""
+    sql, params = browse_sql(letter, by)
+    rows = conn.execute(sql, params).fetchall()
+    counts = {r["letter"]: r["n"] for r in conn.execute(letter_counts_sql(by))}
+    return {"letter": letter, "by": by, "stocks": rows, "truncated": len(rows) >= BROWSE_LIMIT, "letters": counts}

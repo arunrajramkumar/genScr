@@ -1,3 +1,4 @@
+from collections import Counter
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -58,8 +59,9 @@ def stats(conn=Depends(get_conn)):
     out = {}
     for c in cols:
         out[c] = screener.distribution([r[c] for r in rows if r[c] is not None])
-    sectors = sorted({r["sector"] for r in rows if r["sector"]})
-    return {"fields": out, "sectors": sectors, "universe": len(rows)}
+    counts = Counter(r["sector"] for r in rows if r["sector"])
+    sectors = sorted(counts)
+    return {"fields": out, "sectors": sectors, "sector_counts": [[s, counts[s]] for s in sectors], "universe": len(rows)}
 
 
 @router.get("/fields")
