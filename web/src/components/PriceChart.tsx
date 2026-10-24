@@ -192,3 +192,21 @@ export function ReturnLinesChart({ series }: { series: { time: string; price: nu
 
   return <div ref={ref} className="h-[260px] w-full" />;
 }
+
+/** Distance below the running peak over time (drawdown, %). */
+export function UnderwaterChart({ series }: { series: { time: string; value: number }[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!ref.current || !series.length) return;
+    const chart = createChart(ref.current, { ...BASE_OPTIONS, handleScroll: false, handleScale: false });
+    chart.addAreaSeries({
+      lineColor: DOWN, lineWidth: 1, topColor: "rgba(255,77,94,0.05)", bottomColor: "rgba(255,77,94,0.35)",
+      invertFilledArea: true, priceLineVisible: false, priceFormat: { type: "custom", formatter: (v: number) => `${v.toFixed(0)}%` },
+    }).setData(series);
+    chart.timeScale().fitContent();
+    return () => chart.remove();
+  }, [series]);
+
+  return <div ref={ref} className="h-[180px] w-full" />;
+}

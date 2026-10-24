@@ -13,6 +13,7 @@ import { fmtField, toNum } from "@/lib/format";
 import type { CompareResponse } from "@/lib/types";
 
 const CompareChart = dynamic(() => import("@/components/PriceChart").then((m) => m.CompareChart), { ssr: false, loading: () => <Loading /> });
+const CompareInsights = dynamic(() => import("@/components/CompareInsights"), { ssr: false, loading: () => <Loading /> });
 
 const ROWS = [
   "close", "market_cap", "pe", "pb", "dividend_yield", "roe", "roce", "debt_to_equity", "net_margin", "revenue_growth_yoy",
@@ -42,6 +43,11 @@ function Compare() {
     const cleaned = input.toUpperCase().split(/[\s,]+/).filter(Boolean).slice(0, 5).join(",");
     router.push(`/compare?symbols=${encodeURIComponent(cleaned)}`);
   };
+
+  // Same stock order (and so the same colours) everywhere on the page.
+  const orderedPerformance = data
+    ? Object.fromEntries(data.stocks.filter((s) => data.performance[s.symbol]).map((s) => [s.symbol, data.performance[s.symbol]]))
+    : null;
 
   /** Index of the best stock for a row, or -1 when the field has no direction. */
   const best = (field: string): number => {
@@ -75,14 +81,16 @@ function Compare() {
           <div className="panel p-4">
             <div className="label mb-2">1-year performance (rebased to 100)</div>
             <div className="mb-2 flex flex-wrap gap-3 text-xs">
-              {Object.keys(data.performance).map((s, i) => (
+              {orderedPerformance && Object.keys(orderedPerformance).map((s, i) => (
                 <span key={s} className="inline-flex items-center gap-1.5">
                   <span className="h-2 w-2 rounded-full" style={{ background: LINE_COLORS[i % LINE_COLORS.length] }} /> {s}
                 </span>
               ))}
             </div>
-            <CompareChart series={data.performance} />
+            <CompareChart series={orderedPerformance ?? {}} />
           </div>
+
+          <CompareInsights stocks={data.stocks} />
 
           <SectionNote>Highlights mark the numerically higher/lower value only. They are not a ranking or a recommendation.</SectionNote>
           <div className="panel overflow-x-auto">

@@ -168,3 +168,43 @@ export interface TimelineEvent {
   text: string;
   source: string;
 }
+
+export interface Drawdown {
+  peak_date: string;
+  trough_date: string;
+  depth_pct: number;
+  recovered_date: string | null;
+  days_to_recover: number | null;
+  days_underwater: number;
+}
+
+export interface RiskResponse {
+  since: string;
+  volatility_1y_pct: number | null;
+  up_days_1y_pct: number | null;
+  current_drawdown_pct: number;
+  peak_date: string;
+  worst_drawdowns: Drawdown[];
+  underwater: { time: string; value: number }[];
+  calendar_years: { year: number; return_pct: number; partial: boolean }[];
+  monthly: { year: number; month: number; return_pct: number }[];
+  seasonality: { month: number; avg_pct: number; up: number; years: number }[];
+}
+
+export interface RankMetric {
+  field: string;
+  label: string;
+  value: number;
+  market_percentile: number;
+  market_rank: number;
+  market_total: number;
+  sector_percentile?: number;
+  sector_rank?: number;
+  sector_total?: number;
+}
+
+export interface RanksResponse {
+  sector: string | null;
+  sector_size: number;
+  metrics: RankMetric[];
+}

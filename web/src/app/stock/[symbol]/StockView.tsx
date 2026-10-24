@@ -24,6 +24,8 @@ const Outlook = dynamic(() => import("@/components/Outlook"), { ssr: false });
 const TotalReturn = dynamic(() => import("@/components/TotalReturn"), { ssr: false });
 const DividendHistory = dynamic(() => import("@/components/DividendHistory"), { ssr: false });
 const CompanyTimeline = dynamic(() => import("@/components/CompanyTimeline"), { ssr: false });
+const PeerRanks = dynamic(() => import("@/components/PeerRanks"), { ssr: false });
+const RiskProfile = dynamic(() => import("@/components/RiskProfile"), { ssr: false });
 
 /** Symbol from the URL. Static hosting serves one prebuilt shell for every /stock/<SYMBOL>, so read the real path. */
 function useSymbol(): string | null {
@@ -149,6 +151,10 @@ export default function StockView() {
       {prices && prices.length > 0 && <PriceCagr prices={prices} />}
 
       <TotalReturn symbol={stock.symbol} />
+
+      <PeerRanks symbol={stock.symbol} />
+
+      <RiskProfile symbol={stock.symbol} />
 
       {/* What-if + outlook */}
       {prices && prices.length > 0 && (

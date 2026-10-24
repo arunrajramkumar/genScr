@@ -10,6 +10,8 @@ from app.db import get_conn
 from app.services.adjust import adjust
 from app.services.dividends import dividend_history
 from app.services.facts import build_facts
+from app.services.ranks import RANKED, percentile_ranks
+from app.services.risk import risk_profile
 from app.services.timeline import build_timeline
 from app.services.total_return import total_return
 
@@ -191,3 +193,26 @@ def get_total_return(
     first = prices[0]["trade_date"]
     result["available_years"] = int((end - first).days / 365.25 + 0.02)
     return result
+
+
+@router.get("/{symbol}/risk")
+@cached(maxsize=512)
+def get_risk(symbol: str, conn=Depends(get_conn)):
+    symbol = normalize_symbol(symbol)
+    raw = _raw_prices(conn, symbol)
+    if not raw:
+        raise HTTPException(404, f"No prices for {symbol}")
+    result = risk_profile(adjust(raw, _actions(conn, symbol) or None))
+    if result is None:
+        raise HTTPException(404, "Not enough price history")
+    return result
+
+
+@router.get("/{symbol}/ranks")
+@cached(maxsize=512)
+def get_ranks(symbol: str, conn=Depends(get_conn)):
+    symbol = normalize_symbol(symbol)
+    rows = conn.execute(
+        f"SELECT m.symbol, s.sector, {', '.join('m.' + f for f in RANKED)} FROM stock_metrics m JOIN stocks s USING (symbol)"
+    ).fetchall()
+    return percentile_ranks(symbol, rows)
